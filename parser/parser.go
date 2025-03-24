@@ -100,6 +100,7 @@ func (p *Parser) parse(excelFile string) {
 
 func (p *Parser) Export() {
 	p.checks()
+	p.exportProto()
 	p.exportCode()
 	p.exportData()
 }
@@ -121,6 +122,15 @@ func (p *Parser) hasEnumParser(sheetName string) bool {
 func (p *Parser) checks() {
 	for _, sheet := range p.sheets {
 		sheet.checks(p)
+	}
+}
+
+func (p *Parser) exportProto() {
+	for _, v := range p.sheets {
+		for _, f := range AllFilters {
+			ns := v.SplitByFilter(f)
+			ns.ExportProto()
+		}
 	}
 }
 

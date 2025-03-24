@@ -1,11 +1,14 @@
 package parser
 
 import (
+	"excel2pb/config"
 	"fmt"
 	"github.com/xuri/excelize/v2"
 	"log/slog"
+	"os"
 	"regexp"
 	"strings"
+	"text/template"
 )
 
 var reTrimTag = regexp.MustCompile(`[\n\t\r ]+`)
@@ -26,6 +29,14 @@ type Sheet struct {
 
 	// 数据
 	data [][]string
+}
+
+func (s *Sheet) IsClient() bool {
+	return s.filter == ClientFlag
+}
+
+func (s *Sheet) IsServer() bool {
+	return s.filter == ServerFlag
 }
 
 type SheetParser struct {
@@ -226,7 +237,7 @@ func (s *SheetParser) checkTags(root *Parser) {
 					_ = embedSheetName
 					_ = embedFiledName
 					embedSheetName = embedSheetName
-					slog.Warn("not implemented tag checker", "tag", tag)
+					slog.Error("not implemented tag checker", "tag", tag)
 				}
 
 			case TagIndexName:
@@ -234,4 +245,103 @@ func (s *SheetParser) checkTags(root *Parser) {
 			}
 		}
 	}
+}
+
+func (s *SheetParser) SplitByFilter(filterName string) *SheetParser {
+	ns := &SheetParser{
+		logger: s.logger,
+		Sheet: Sheet{
+			headersIndexes: make(map[string]int32),
+		},
+	}
+	ns.sheetName = s.sheetName
+	ns.filter = filterName
+
+	// 复制过滤后的表头
+	for i, head := range s.headers {
+		if head.IsFilter(filterName) {
+			ns.headers = append(ns.headers, head)
+			ns.headersIndexes[head.Name()] = int32(i)
+		}
+	}
+
+	// 复制过滤后的数据
+	for _, row := range s.data {
+		var newRow []string
+		for _, head := range ns.headers {
+			colIndex := s.GetFieldColIndex(head.Name())
+			newRow = append(newRow, row[colIndex])
+		}
+		ns.data = append(ns.data, newRow)
+	}
+
+	// 重建表头索引
+	for i, head := range ns.headers {
+		ns.headersIndexes[head.Name()] = int32(i)
+	}
+
+	return ns
+}
+
+func (s *SheetParser) ExportProto() {
+
+	// 解析模板
+	tmpl, err := template.New("proto").Parse(ProtoTemplate)
+	if err != nil {
+		slog.Error("parse proto template fail", "error", err)
+		return
+	}
+
+	// 数据驱动模板
+	m := &ProtoModel{
+		PackageName: s.getPackageName(),
+		SheetName:   s.sheetName,
+	}
+	for t, v := range s.headers {
+		m.Fields = append(m.Fields, FieldModel{
+			ProtoType: v.ProtoType(),
+			FieldName: v.Name(),
+			FieldTag:  t + 1,
+			Comment:   v.Desc(),
+		})
+	}
+
+	outPath := s.getProtoOutPath()
+	os.MkdirAll(outPath, os.ModePerm)
+	fileName := fmt.Sprintf("%v/%v.proto", outPath, s.sheetName)
+	f, err := os.Open(fileName)
+	if err != nil {
+		f, err = os.Create(fileName)
+		if err != nil {
+			slog.Error("create proto file fail", "error", err)
+			return
+		}
+	}
+
+	err = tmpl.Execute(f, m)
+
+}
+
+func (s *SheetParser) getPackageName() string {
+	if s.IsClient() {
+		return "pb"
+	}
+
+	if s.IsServer() {
+		return "pbs"
+	}
+
+	return ""
+}
+
+func (s *SheetParser) getProtoOutPath() string {
+	if s.IsClient() {
+		return fmt.Sprintf("%v/client/", config.OUT_PROTO_PATH)
+	}
+
+	if s.IsServer() {
+		return fmt.Sprintf("%v/server/", config.OUT_PROTO_PATH)
+	}
+
+	return fmt.Sprintf("%v/shared/", config.OUT_PROTO_PATH)
 }

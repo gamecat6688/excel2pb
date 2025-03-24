@@ -5,6 +5,9 @@ const (
 	// excel原始表格路径
 	ExcelDir = "assets/xls/"
 
+	// 导出的proto目录
+	OUT_PROTO_PATH = "assets/out_proto/"
+
 	// 导出的数据目录
 	OUT_DATA_PATH = "assets/out_data/"
 

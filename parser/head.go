@@ -11,6 +11,13 @@ const (
 	ServerFlag     = "s"
 )
 
+var (
+	AllFilters = []string{
+		ClientFlag,
+		ServerFlag,
+	}
+)
+
 // 字段功能
 const (
 	// HeadName 变量名，英文命名，且需要符合导出语言的命名规则
@@ -43,6 +50,10 @@ func (h Head) Name() string {
 	return h.info[HeadName]
 }
 
+func (h Head) Desc() string {
+	return h.info[HeadDesc]
+}
+
 // Type 返回类型，包含repeated, pk, unique等修饰符
 func (h Head) Type() string {
 	return h.info[HeadType]
@@ -51,7 +62,21 @@ func (h Head) Type() string {
 // BaseType 只返回基础类型，不返回repeated, pk, unique等修饰符
 func (h Head) BaseType() string {
 	ss := strings.Split(h.Type(), " ")
+	if len(ss) == 1 {
+		return ss[0]
+	}
 	return strings.Trim(ss[1], " ")
+}
+
+// ProtoType 返回protobuf支持的类型
+func (h Head) ProtoType() string {
+	ss := strings.Split(h.Type(), " ")
+	if ss[0] == "repeated" {
+		return h.Type()
+	} else if ss[0] == I18nName {
+		return "string"
+	}
+	return h.BaseType()
 }
 
 func (h Head) HasTags() bool {
@@ -78,7 +103,7 @@ func (h Head) IsI18n() bool {
 	return strings.Index(h.Type(), I18nName) != -1
 }
 
-func (h Head) IsOutput(key string) bool {
+func (h Head) IsFilter(key string) bool {
 	str := h.info[HeadExport]
 	if str == "" {
 		return false
@@ -89,10 +114,10 @@ func (h Head) IsOutput(key string) bool {
 
 // IsExportClient 是否导出客户端 C
 func (h Head) IsExportClient() bool {
-	return h.IsOutput(ClientFlag)
+	return h.IsFilter(ClientFlag)
 }
 
 // IsExportServer 是否导出服务器 S
 func (h Head) IsExportServer() bool {
-	return h.IsOutput(ServerFlag)
+	return h.IsFilter(ServerFlag)
 }
