@@ -12,6 +12,10 @@ option go_package = "/{{.PackageName}}";
 import {{.ProtoPath}}
 {{end}}
 
+message {{.SheetName}}Config {
+  repeated {{.SheetName}} Data = 1;
+}
+
 message {{.SheetName}} {
 {{range .Fields}}  {{.ProtoType}} {{.FieldName}} = {{.FieldTag}}; // {{.Comment}}
 {{end}}
