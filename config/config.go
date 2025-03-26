@@ -6,7 +6,8 @@ const (
 	ExcelDir = "assets/xls/"
 
 	// 导出的proto目录
-	OutProtoPath = "assets/out_proto/"
+	ClientOutProtoPath = "assets/out_proto/client/"
+	ServerOutProtoPath = "assets/out_proto/server/"
 
 	// proto的import路径
 	ProtoImportPath = "" // /结尾

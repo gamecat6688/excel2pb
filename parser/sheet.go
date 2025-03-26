@@ -3,9 +3,13 @@ package parser
 import (
 	"excel2pb/config"
 	"fmt"
+	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/desc/protoparse"
+	"github.com/jhump/protoreflect/dynamic"
 	"github.com/xuri/excelize/v2"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"text/template"
@@ -39,6 +43,12 @@ func (s *Sheet) IsServer() bool {
 	return s.filter == ServerFlag
 }
 
+func (s *Sheet) HasData() bool {
+	return len(s.data) > 0
+}
+
+// //////////////////////
+// SheetParser
 type SheetParser struct {
 	Sheet
 	logger *slog.Logger
@@ -283,10 +293,40 @@ func (s *SheetParser) SplitByFilter(filterName string) *SheetParser {
 	return ns
 }
 
+func (s *SheetParser) getPackageName() string {
+	if s.IsClient() {
+		return config.ClientProtoPackage
+	}
+
+	if s.IsServer() {
+		return config.ServerProtoPackage
+	}
+
+	return ""
+}
+
+func (s *SheetParser) getProtoOutPath() string {
+	if s.IsClient() {
+		return config.ClientOutProtoPath
+	}
+
+	if s.IsServer() {
+		return config.ServerOutProtoPath
+	}
+
+	return ""
+}
+
+func (s *SheetParser) getProtoFilePath() string {
+	return filepath.Join(s.getProtoOutPath(), s.getProtoName())
+}
+
+func (s *SheetParser) getProtoName() string {
+	return s.sheetName + ".proto"
+}
+
 // import "playerstate/ExampleNonBasicPart.proto";
-
 func (s *SheetParser) ExportProto(root *Parser) {
-
 	// 解析模板
 	tmpl, err := template.New("proto").Parse(ProtoTemplate)
 	if err != nil {
@@ -319,8 +359,7 @@ func (s *SheetParser) ExportProto(root *Parser) {
 	// 创建proto文件
 	outPath := s.getProtoOutPath()
 	os.MkdirAll(outPath, os.ModePerm)
-	fileName := fmt.Sprintf("%v/%v.proto", outPath, s.sheetName)
-	f, err := os.Create(fileName)
+	f, err := os.Create(s.getProtoFilePath())
 	if err != nil {
 		slog.Error("create proto file fail", "error", err)
 		return
@@ -334,26 +373,64 @@ func (s *SheetParser) ExportProto(root *Parser) {
 	}
 }
 
-func (s *SheetParser) getPackageName() string {
-	if s.IsClient() {
-		return config.ClientProtoPackage
+func (s *SheetParser) ExportData(root *Parser) {
+	if !s.HasData() {
+		return
 	}
 
-	if s.IsServer() {
-		return config.ServerProtoPackage
+	// 1. 解析 .proto 文件
+	parser := protoparse.Parser{}
+	parser.InferImportPaths = true
+	parser.ImportPaths = []string{
+		s.getProtoOutPath(),
+	}
+	fileDescriptors, err := parser.ParseFiles(s.getProtoName())
+	if err != nil {
+		panic(err)
 	}
 
-	return ""
+	// 2. 获取消息描述符
+	messageName := fmt.Sprintf("%v.%v", s.getPackageName(), s.sheetName)
+	msgDesc := fileDescriptors[0].FindMessage(messageName)
+
+	// 3. 创建动态消息并填充数据
+	dynamicMsg := dynamic.NewMessage(msgDesc)
+	dynamicMsg.SetFieldByName("name", "John")
+	dynamicMsg.SetFieldByName("age", int32(30))
+
+	// 4. 序列化
+	data, err := dynamicMsg.Marshal()
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println("data: ", data)
+
 }
 
-func (s *SheetParser) getProtoOutPath() string {
-	if s.IsClient() {
-		return fmt.Sprintf("%v/client/", config.OutProtoPath)
+func (s *SheetParser) buildDatasetDescriptor() (*desc.MessageDescriptor, error) {
+	// 1. 解析 .proto 文件
+	parser := protoparse.Parser{}
+	fileDescriptors, err := parser.ParseFiles("person.proto")
+	if err != nil {
+		panic(err)
 	}
 
-	if s.IsServer() {
-		return fmt.Sprintf("%v/server/", config.OutProtoPath)
+	// 2. 获取消息描述符
+	msgDesc := fileDescriptors[0].FindMessage("pbs.Resource")
+
+	// 3. 创建动态消息并填充数据
+	dynamicMsg := dynamic.NewMessage(msgDesc)
+	dynamicMsg.SetFieldByName("name", "John")
+	dynamicMsg.SetFieldByName("age", int32(30))
+
+	// 4. 序列化
+	data, err := dynamicMsg.Marshal()
+	if err != nil {
+		panic(err)
 	}
 
-	return fmt.Sprintf("%v/shared/", config.OutProtoPath)
+	fmt.Printf("Serialized data: %x\n", data)
+
+	return nil, nil
 }
