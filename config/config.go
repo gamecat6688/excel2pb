@@ -6,20 +6,27 @@ const (
 	ExcelDir = "assets/xls/"
 
 	// 导出的proto目录
-	OUT_PROTO_PATH = "assets/out_proto/"
+	OutProtoPath = "assets/out_proto/"
+
+	// proto的import路径
+	ProtoImportPath = "" // /结尾
+	// 客户端proto包名
+	ClientProtoPackage = "pb"
+	// 服务器proto包名
+	ServerProtoPackage = "pbs"
 
 	// 导出的数据目录
-	OUT_DATA_PATH = "assets/out_data/"
+	OutDataPath = "assets/out_data/"
 
 	// 输出代码的路径
-	OUT_CODE_CPP_PATH    = "assets/out_code/cpp/"
-	OUT_CODE_CSHARP_PATH = "assets/out_code/csharp/"
-	OUT_CODE_JAVA_PATH   = "assets/out_code/java/"
-	OUT_CODE_GOLANG_PATH = "assets/out_code/golang/"
+	OutCodeCppPath    = "assets/out_code/cpp/"
+	OutCodeCsharpPath = "assets/out_code/csharp/"
+	OutCodeJavaPath   = "assets/out_code/java/"
+	OutCodeGolangPath = "assets/out_code/golang/"
 
 	// 代码模板的输入路径
-	TPL_CODE_CPP_PATH    = "assets/template/cpp/"
-	TPL_CODE_CSHARP_PATH = "assets/template/csharp/"
-	TPL_CODE_JAVA_PATH   = "assets/template/java/"
-	TPL_CODE_GOLANG_PATH = "assets/template/golang/"
+	TplCodeCppPath    = "assets/template/cpp/"
+	TplCodeCsharpPath = "assets/template/csharp/"
+	TplCodeJavaPath   = "assets/template/java/"
+	TplCodeGolangPath = "assets/template/golang/"
 )

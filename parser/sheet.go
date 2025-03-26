@@ -283,7 +283,9 @@ func (s *SheetParser) SplitByFilter(filterName string) *SheetParser {
 	return ns
 }
 
-func (s *SheetParser) ExportProto() {
+// import "playerstate/ExampleNonBasicPart.proto";
+
+func (s *SheetParser) ExportProto(root *Parser) {
 
 	// 解析模板
 	tmpl, err := template.New("proto").Parse(ProtoTemplate)
@@ -298,6 +300,14 @@ func (s *SheetParser) ExportProto() {
 		SheetName:   s.sheetName,
 	}
 	for t, v := range s.headers {
+		baseType := v.BaseType()
+		if root.hasSheetParser(baseType) {
+			// 引用其他proto
+			m.Imports = append(m.Imports, ImportModel{
+				ProtoPath: fmt.Sprintf(`"%v%v.proto";`, config.ProtoImportPath, baseType),
+			})
+		}
+
 		m.Fields = append(m.Fields, FieldModel{
 			ProtoType: v.ProtoType(),
 			FieldName: v.Name(),
@@ -306,29 +316,31 @@ func (s *SheetParser) ExportProto() {
 		})
 	}
 
+	// 创建proto文件
 	outPath := s.getProtoOutPath()
 	os.MkdirAll(outPath, os.ModePerm)
 	fileName := fmt.Sprintf("%v/%v.proto", outPath, s.sheetName)
-	f, err := os.Open(fileName)
+	f, err := os.Create(fileName)
 	if err != nil {
-		f, err = os.Create(fileName)
-		if err != nil {
-			slog.Error("create proto file fail", "error", err)
-			return
-		}
+		slog.Error("create proto file fail", "error", err)
+		return
 	}
 
+	// 执行模板,输出文件
 	err = tmpl.Execute(f, m)
-
+	if err != nil {
+		slog.Error("tmpl.Execute fail", "error", err)
+		return
+	}
 }
 
 func (s *SheetParser) getPackageName() string {
 	if s.IsClient() {
-		return "pb"
+		return config.ClientProtoPackage
 	}
 
 	if s.IsServer() {
-		return "pbs"
+		return config.ServerProtoPackage
 	}
 
 	return ""
@@ -336,12 +348,12 @@ func (s *SheetParser) getPackageName() string {
 
 func (s *SheetParser) getProtoOutPath() string {
 	if s.IsClient() {
-		return fmt.Sprintf("%v/client/", config.OUT_PROTO_PATH)
+		return fmt.Sprintf("%v/client/", config.OutProtoPath)
 	}
 
 	if s.IsServer() {
-		return fmt.Sprintf("%v/server/", config.OUT_PROTO_PATH)
+		return fmt.Sprintf("%v/server/", config.OutProtoPath)
 	}
 
-	return fmt.Sprintf("%v/shared/", config.OUT_PROTO_PATH)
+	return fmt.Sprintf("%v/shared/", config.OutProtoPath)
 }
