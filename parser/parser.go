@@ -129,7 +129,7 @@ func (p *Parser) exportProto() {
 	for _, v := range p.sheets {
 		for _, f := range AllFilters {
 			ns := v.SplitByFilter(f)
-			ns.ExportProto()
+			ns.ExportProto(p)
 		}
 	}
 }
