@@ -102,8 +102,8 @@ func (p *Parser) Export() {
 	p.checks()
 	p.exportProto()
 	p.exportPb()
-	p.exportCode()
 	p.exportData()
+	p.exportCode()
 }
 
 func (p *Parser) hasSheetParser(sheetName string) bool {
@@ -145,9 +145,6 @@ func (p *Parser) exportPb() {
 	}
 }
 
-func (p *Parser) exportCode() {
-}
-
 func (p *Parser) exportData() {
 	for _, v := range p.sheets {
 		for _, f := range AllFilters {
@@ -155,4 +152,7 @@ func (p *Parser) exportData() {
 			ns.ExportData(p)
 		}
 	}
+}
+
+func (p *Parser) exportCode() {
 }
