@@ -7,8 +7,10 @@ import (
 	"github.com/jhump/protoreflect/desc/protoparse"
 	"github.com/jhump/protoreflect/dynamic"
 	"github.com/xuri/excelize/v2"
+	"log"
 	"log/slog"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -314,6 +316,14 @@ func (s *SheetParser) getDataExtension() string {
 	return config.DataExtensions[s.filter]
 }
 
+func (s *SheetParser) getPbOutPath() string {
+	return config.PbOutPaths[s.filter]
+}
+
+func (s *SheetParser) getGenerateLanguage() string {
+	return config.GenerateLanguage[s.filter]
+}
+
 func (s *SheetParser) getDataFilePath() string {
 	return filepath.Join(s.getDataOutPath(), s.sheetName+s.getDataExtension())
 }
@@ -390,6 +400,49 @@ func (s *SheetParser) ExportProto(root *Parser) {
 		slog.Error("tmpl.Execute fail", "error", err)
 		return
 	}
+}
+
+// 例子： protoc --proto_path=".\assets\out_proto\server" --go_out=".\assets\out_pb\server" "assets\out_proto\server\Item.proto"
+func (s *SheetParser) ExportPb(root *Parser) {
+	// make dirs
+	outPath := s.getPbOutPath()
+	os.MkdirAll(outPath, os.ModePerm)
+
+	switch s.getGenerateLanguage() {
+	case "golang":
+		argInclude := fmt.Sprintf("--proto_path=%v", s.getProtoOutPath())
+		argGoOut := fmt.Sprintf("--go_out=%v", s.getPbOutPath())
+		cmd := exec.Command("protoc", argInclude, argGoOut, s.getProtoFilePath())
+		err := cmd.Run()
+		if err != nil {
+			log.Fatalf("protoc failed: %v", err)
+		}
+	case "csharp":
+		argInclude := fmt.Sprintf("--proto_path=%v", s.getProtoOutPath())
+		argCsharpOut := fmt.Sprintf("--csharp_out=%v", s.getPbOutPath())
+		cmd := exec.Command("protoc", argInclude, argCsharpOut, s.getProtoFilePath())
+		err := cmd.Run()
+		if err != nil {
+			log.Fatalf("protoc failed: %v", err)
+		}
+	case "java":
+		argInclude := fmt.Sprintf("--proto_path=%v", s.getProtoOutPath())
+		argGoOut := fmt.Sprintf("--java_out=%v", s.getPbOutPath())
+		cmd := exec.Command("protoc", argInclude, argGoOut, s.getProtoFilePath())
+		err := cmd.Run()
+		if err != nil {
+			log.Fatalf("protoc failed: %v", err)
+		}
+	case "cpp":
+		argInclude := fmt.Sprintf("--proto_path=%v", s.getProtoOutPath())
+		argGoOut := fmt.Sprintf("--cpp_out=%v", s.getPbOutPath())
+		cmd := exec.Command("protoc", argInclude, argGoOut, s.getProtoFilePath())
+		err := cmd.Run()
+		if err != nil {
+			log.Fatalf("protoc failed: %v", err)
+		}
+	}
+
 }
 
 func (s *SheetParser) ExportData(root *Parser) {
@@ -484,9 +537,11 @@ func (s *SheetParser) ExportData(root *Parser) {
 		panic(err)
 	}
 
+	// make dirs
 	outPath := s.getDataOutPath()
 	os.MkdirAll(outPath, os.ModePerm)
 
+	// write data file
 	dataFilePath := s.getDataFilePath()
 	os.WriteFile(dataFilePath, data, os.ModePerm)
 }
