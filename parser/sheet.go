@@ -184,6 +184,9 @@ func (s *SheetParser) hasExistFiledValue(filedName string, filedValue string) bo
 
 func (s *SheetParser) getFiledValue(filedName string, rowIndex int32) string {
 	colIndex := s.getFieldColIndex(filedName)
+	if int(colIndex) >= len(s.data[rowIndex]) {
+		return ""
+	}
 	return s.data[rowIndex][colIndex]
 }
 
@@ -229,6 +232,8 @@ func (s *SheetParser) checkTags(root *Parser) {
 			switch key {
 			case TagFkName:
 				embedSheetName, embedFiledName, fkSheetName, fkFiledName := tag.ParseForeignKey()
+				_ = embedFiledName
+
 				if len(embedSheetName) == 0 {
 					// 没有内嵌结构
 
@@ -239,7 +244,7 @@ func (s *SheetParser) checkTags(root *Parser) {
 
 					// 检测外键的字段值是否存在（支持repeated）
 					refSheetParser := root.getSheetParser(fkSheetName)
-					for rowIndex := range s.data {
+					for rowIndex, _ := range s.data {
 						thisValue := s.getFiledValue(head.Name(), int32(rowIndex))
 						values := SplitBaseValue(thisValue)
 						for _, checkValue := range values {
@@ -253,11 +258,27 @@ func (s *SheetParser) checkTags(root *Parser) {
 
 				} else {
 					// 有内嵌结构
-					// TODO
-					_ = embedSheetName
-					_ = embedFiledName
-					embedSheetName = embedSheetName
-					slog.Error("not implemented tag checker", "tag", tag)
+
+					// 检测外键的表是否存在
+					if !root.hasSheetParser(fkSheetName) {
+						slog.Error(fmt.Sprintf("[%v.%v]check foreign key fail, sheet not found: %v", s.sheetName, head.Name(), fkSheetName))
+					}
+
+					// 检测外键的字段值是否存在（支持repeated）
+					refSheetParser := root.getSheetParser(fkSheetName)
+					for rowIndex, _ := range s.data {
+						thisValue := s.getFiledValue(head.Name(), int32(rowIndex))
+						values := SplitCustomValue(thisValue)
+						for _, checkMsg := range values {
+							idx := refSheetParser.getFieldColIndex(fkFiledName)
+							checkValue := checkMsg[idx]
+							if !refSheetParser.hasExistFiledValue(fkFiledName, checkValue) {
+								slog.Error(fmt.Sprintf("[%v.%v]check foreign key fail, ref value is excel row=%v, failValue=%v, value=%v, not found: %v.%v",
+									s.sheetName, head.Name(),
+									DataRowIndex2ExcelRow(int32(rowIndex)), checkValue, thisValue, fkSheetName, fkFiledName))
+							}
+						}
+					}
 				}
 
 			case TagIndexName:
@@ -481,14 +502,14 @@ func (s *SheetParser) ExportData(root *Parser) {
 				customs := s.procCustomProtoType(root, ds, fd, value)
 				if fd.IsRepeated() {
 					record.SetFieldByName(fd.Name(), customs)
-				} else {
+				} else if customs != nil {
 					record.SetFieldByName(fd.Name(), customs[0])
 				}
 			} else {
 				arrValue := s.procBaseProtoType(fd, value)
 				if fd.IsRepeated() {
 					record.SetFieldByName(fd.Name(), arrValue)
-				} else {
+				} else if arrValue != nil {
 					record.SetFieldByName(fd.Name(), arrValue[0])
 				}
 			}
