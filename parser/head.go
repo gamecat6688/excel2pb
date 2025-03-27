@@ -98,6 +98,11 @@ func (h Head) IsRepeated() bool {
 	return strings.Index(h.Type(), RepeatedName) != -1
 }
 
+// IsCustom 是否自定义结构
+func (h Head) IsCustom(root *Parser) bool {
+	return root.hasSheetParser(h.BaseType())
+}
+
 // IsI18n 是否多语言字段
 func (h Head) IsI18n() bool {
 	return strings.Index(h.Type(), I18nName) != -1
