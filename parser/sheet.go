@@ -408,41 +408,25 @@ func (s *SheetParser) ExportPb(root *Parser) {
 	outPath := s.getPbOutPath()
 	os.MkdirAll(outPath, os.ModePerm)
 
+	argInclude := fmt.Sprintf("--proto_path=%v", s.getProtoOutPath())
+	argOut := ""
+
 	switch s.getGenerateLanguage() {
 	case "golang":
-		argInclude := fmt.Sprintf("--proto_path=%v", s.getProtoOutPath())
-		argGoOut := fmt.Sprintf("--go_out=%v", s.getPbOutPath())
-		cmd := exec.Command("protoc", argInclude, argGoOut, s.getProtoFilePath())
-		err := cmd.Run()
-		if err != nil {
-			log.Fatalf("protoc failed: %v", err)
-		}
+		argOut = fmt.Sprintf("--go_out=%v", s.getPbOutPath())
 	case "csharp":
-		argInclude := fmt.Sprintf("--proto_path=%v", s.getProtoOutPath())
-		argCsharpOut := fmt.Sprintf("--csharp_out=%v", s.getPbOutPath())
-		cmd := exec.Command("protoc", argInclude, argCsharpOut, s.getProtoFilePath())
-		err := cmd.Run()
-		if err != nil {
-			log.Fatalf("protoc failed: %v", err)
-		}
+		argOut = fmt.Sprintf("--csharp_out=%v", s.getPbOutPath())
 	case "java":
-		argInclude := fmt.Sprintf("--proto_path=%v", s.getProtoOutPath())
-		argGoOut := fmt.Sprintf("--java_out=%v", s.getPbOutPath())
-		cmd := exec.Command("protoc", argInclude, argGoOut, s.getProtoFilePath())
-		err := cmd.Run()
-		if err != nil {
-			log.Fatalf("protoc failed: %v", err)
-		}
+		argOut = fmt.Sprintf("--java_out=%v", s.getPbOutPath())
 	case "cpp":
-		argInclude := fmt.Sprintf("--proto_path=%v", s.getProtoOutPath())
-		argGoOut := fmt.Sprintf("--cpp_out=%v", s.getPbOutPath())
-		cmd := exec.Command("protoc", argInclude, argGoOut, s.getProtoFilePath())
-		err := cmd.Run()
-		if err != nil {
-			log.Fatalf("protoc failed: %v", err)
-		}
+		argOut = fmt.Sprintf("--cpp_out=%v", s.getPbOutPath())
 	}
 
+	cmd := exec.Command("protoc", argInclude, argOut, s.getProtoFilePath())
+	err := cmd.Run()
+	if err != nil {
+		log.Fatalf("protoc failed: %v", err)
+	}
 }
 
 func (s *SheetParser) ExportData(root *Parser) {
