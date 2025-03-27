@@ -16,9 +16,17 @@ func SplitEnumName(sheetName string) string {
 
 // SplitBaseValue 一维数组
 // ab;df;asd
-func SplitBaseValue(str string) []string {
+func SplitBaseValue(str string) (rv []string) {
 	ss := strings.Split(str, ";")
-	return ss
+	for _, v := range ss {
+		val := strings.Trim(v, " ")
+		if len(val) == 0 {
+			continue
+		}
+
+		rv = append(rv, val)
+	}
+	return
 }
 
 // SplitCustomValue 二维数组
@@ -26,6 +34,11 @@ func SplitBaseValue(str string) []string {
 func SplitCustomValue(str string) (rv [][]string) {
 	abab := strings.Split(str, ";")
 	for _, ab := range abab {
+		val := strings.Trim(ab, " ")
+		if len(val) == 0 {
+			continue
+		}
+
 		ss := strings.Split(ab, "|")
 		rv = append(rv, ss)
 	}
