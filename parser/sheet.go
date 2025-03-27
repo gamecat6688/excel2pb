@@ -66,13 +66,13 @@ func NewSheetParser(sheetName string) *SheetParser {
 	}
 }
 
-// GetFieldColIndex 获得指定字段名的列索引
-func (s *SheetParser) GetFieldColIndex(name string) int32 {
+// getFieldColIndex 获得指定字段名的列索引
+func (s *SheetParser) getFieldColIndex(name string) int32 {
 	return s.headersIndexes[name]
 }
 
-// GetFieldColIndex 获得指定字段名的列索引
-func (s *SheetParser) GetField(colIndex int32) Head {
+// GetFiled 获得指定字段名的列索引
+func (s *SheetParser) GetFiled(colIndex int32) Head {
 	return s.headers[colIndex]
 }
 
@@ -155,7 +155,7 @@ func (s *SheetParser) parseData(rows [][]string) {
 // 返回
 func (s *SheetParser) checkFiledValueIsUnique(filedName string) (value string, ok bool) {
 	// 检查指定列的数据，是否存在重复值
-	colIndex := s.GetFieldColIndex(filedName)
+	colIndex := s.getFieldColIndex(filedName)
 	values := make(map[string]bool)
 	for _, row := range s.data {
 		v := row[colIndex]
@@ -172,7 +172,7 @@ func (s *SheetParser) checkFiledValueIsUnique(filedName string) (value string, o
 // 可以缓存成map，减少重复计算
 func (s *SheetParser) hasExistFiledValue(filedName string, filedValue string) bool {
 	// 检查指定列的数据，是否存在
-	colIndex := s.GetFieldColIndex(filedName)
+	colIndex := s.getFieldColIndex(filedName)
 	for _, row := range s.data {
 		value := row[colIndex]
 		if value == filedValue {
@@ -183,7 +183,7 @@ func (s *SheetParser) hasExistFiledValue(filedName string, filedValue string) bo
 }
 
 func (s *SheetParser) getFiledValue(filedName string, rowIndex int32) string {
-	colIndex := s.GetFieldColIndex(filedName)
+	colIndex := s.getFieldColIndex(filedName)
 	return s.data[rowIndex][colIndex]
 }
 
@@ -286,7 +286,10 @@ func (s *SheetParser) SplitByFilter(filterName string) *SheetParser {
 	for _, row := range s.data {
 		var newRow []string
 		for _, head := range ns.headers {
-			colIndex := s.GetFieldColIndex(head.Name())
+			colIndex := s.getFieldColIndex(head.Name())
+			if int(colIndex) >= len(row) {
+				continue
+			}
 			newRow = append(newRow, row[colIndex])
 		}
 		ns.data = append(ns.data, newRow)
@@ -452,12 +455,16 @@ func (s *SheetParser) ExportData(root *Parser) {
 		panic(err)
 	}
 
+	// 构建一个索引map，key is proto name
+	indexesFileDescriptors := make(map[string]*desc.FileDescriptor)
+	for _, v := range fileDescriptors {
+		indexesFileDescriptors[v.GetName()] = v
+	}
+
 	// 2. 获取消息描述符
 	configMsgName := fmt.Sprintf("%v.%v", s.getPackageName(), s.sheetName)
 	configDesc := fileDescriptors[0].FindMessage(configMsgName + "Config")
 	recordDesc := fileDescriptors[0].FindMessage(configMsgName)
-	//resourceDesc := fileDescriptors[1].FindMessage(configMsgName)
-	//_ = resourceDesc
 
 	// 5. 构造多个 record 数据
 	var records []*dynamic.Message
@@ -465,54 +472,30 @@ func (s *SheetParser) ExportData(root *Parser) {
 		record := dynamic.NewMessage(recordDesc)
 
 		for colIdx, value := range row {
-			fd := s.GetField(int32(colIdx))
-
-			if fd.IsRepeated() {
-				// 数组
-				if fd.IsCustom(root) {
-					// TODO
-					root = root
+			fd := s.GetFiled(int32(colIdx))
+			if fd.IsCustom(root) {
+				ds := indexesFileDescriptors[fd.BaseType()+".proto"]
+				customs := s.procCustomProtoType(root, ds, fd, value)
+				if fd.IsRepeated() {
+					record.SetFieldByName(fd.Name(), customs)
 				} else {
-					var arrValue []interface{}
-					for _, v := range SplitBaseValue(value) {
-						arrValue = append(arrValue, TypeNameToValue(fd.BaseType(), v))
-					}
-					record.SetFieldByName(fd.Name(), arrValue)
+					record.SetFieldByName(fd.Name(), customs[0])
 				}
 			} else {
-				// 变量
-				if fd.IsCustom(root) {
-					// TODO
-					root = root
+				arrValue := s.procBaseProtoType(fd, value)
+				if fd.IsRepeated() {
+					record.SetFieldByName(fd.Name(), arrValue)
 				} else {
-					record.SetFieldByName(fd.Name(), TypeNameToValue(fd.BaseType(), value))
+					record.SetFieldByName(fd.Name(), arrValue[0])
 				}
 			}
-
-			// 构造 Cost（多个 Resource）
-			//var resources []*dynamic.Message
-			//for j := 0; j < 2; j++ {
-			//	resource := dynamic.NewMessage(resourceDesc)
-			//	resource.SetFieldByName("Id", int32(j+1))
-			//	resource.SetFieldByName("Amount", int32((j+1)*100))
-			//	resources = append(resources, resource)
-			//}
-			//record.SetFieldByName("Cost", resources)
 		}
 
 		records = append(records, record)
 	}
 
-	//msgDesc := fileDescriptors[0].FindMessage(messageName)
-	//if len(fileDescriptors) > 1 {
-	//	msgDesc = fileDescriptors[1].FindMessage("pb.Resource")
-	//}
-
 	// 3. 创建动态消息并填充数据
 	configMsg := dynamic.NewMessage(configDesc)
-	//dynamicMsg.SetFieldByName("name", "John")
-	//dynamicMsg.SetFieldByName("age", int32(30))
-
 	configMsg.SetFieldByName("Records", records)
 
 	// 4. 序列化
@@ -530,29 +513,30 @@ func (s *SheetParser) ExportData(root *Parser) {
 	os.WriteFile(dataFilePath, data, os.ModePerm)
 }
 
-func (s *SheetParser) buildDatasetDescriptor() (*desc.MessageDescriptor, error) {
-	// 1. 解析 .proto 文件
-	parser := protoparse.Parser{}
-	fileDescriptors, err := parser.ParseFiles("person.proto")
-	if err != nil {
-		panic(err)
+func (s *SheetParser) procBaseProtoType(fd Head, value string) []interface{} {
+	var arrValue []interface{}
+	for _, v := range SplitBaseValue(value) {
+		arrValue = append(arrValue, TypeNameToValue(fd.BaseType(), v))
+	}
+	return arrValue
+}
+
+func (s *SheetParser) procCustomProtoType(root *Parser, ds *desc.FileDescriptor, fd Head, value string) []*dynamic.Message {
+	var customs []*dynamic.Message
+
+	customParser := root.getSheetParser(fd.BaseType())
+	msgName := fmt.Sprintf("%v.%v", s.getPackageName(), fd.BaseType())
+	customDesc := ds.FindMessage(msgName)
+	// 构造多个子结构
+	customRows := SplitCustomValue(value)
+	for _, customRow := range customRows {
+		customMsg := dynamic.NewMessage(customDesc)
+		for idx, subValue := range customRow {
+			subFd := customParser.GetFiled(int32(idx))
+			customMsg.SetFieldByName(subFd.Name(), TypeNameToValue(subFd.BaseType(), subValue))
+		}
+		customs = append(customs, customMsg)
 	}
 
-	// 2. 获取消息描述符
-	msgDesc := fileDescriptors[0].FindMessage("pbs.Resource")
-
-	// 3. 创建动态消息并填充数据
-	dynamicMsg := dynamic.NewMessage(msgDesc)
-	dynamicMsg.SetFieldByName("name", "John")
-	dynamicMsg.SetFieldByName("age", int32(30))
-
-	// 4. 序列化
-	data, err := dynamicMsg.Marshal()
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Printf("Serialized data: %x\n", data)
-
-	return nil, nil
+	return customs
 }

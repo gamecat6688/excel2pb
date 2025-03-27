@@ -9,6 +9,14 @@ func main() {
 	p.ParseExcels()
 	p.Export()
 
+	//data, err := os.ReadFile("assets/out_data/server/Upgrade.data")
+	//if err != nil {
+	//	panic(err)
+	//}
+	//cfg := &pbs.UpgradeConfig{}
+	//proto.Unmarshal(data, cfg)
+	//fmt.Printf("cfg: %v\n", cfg)
+
 	//if RewriteI18nExcel {
 	//	// 回写多语言表格
 	//	lib.I18n.WriteToExcel(i18nExcelFile)
