@@ -101,6 +101,7 @@ func (p *Parser) parse(excelFile string) {
 func (p *Parser) Export() {
 	p.checks()
 	p.exportProto()
+	p.exportPb()
 	p.exportCode()
 	p.exportData()
 }
@@ -130,6 +131,16 @@ func (p *Parser) exportProto() {
 		for _, f := range AllFilters {
 			ns := v.SplitByFilter(f)
 			ns.ExportProto(p)
+		}
+	}
+}
+
+// exportPb 导出pb
+func (p *Parser) exportPb() {
+	for _, v := range p.sheets {
+		for _, f := range AllFilters {
+			ns := v.SplitByFilter(f)
+			ns.ExportPb(p)
 		}
 	}
 }

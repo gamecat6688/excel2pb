@@ -32,6 +32,12 @@ var (
 		"s": "pbs",
 	}
 
+	// GenerateLanguage 生成代码的语言
+	GenerateLanguage = map[string]string{
+		"c": "csharp",
+		"s": "golang",
+	}
+
 	// CodeOutPaths 输出代码的路径
 	CodeOutPaths = map[string]string{
 		"cpp":    "assets/out_code/cpp/",
