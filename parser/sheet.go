@@ -234,17 +234,20 @@ func (s *SheetParser) checkTags(root *Parser) {
 
 					// 检测外键的表是否存在
 					if !root.hasSheetParser(fkSheetName) {
-						panic(fmt.Sprintf("[%v.%v]check foreign key fail, sheet not found: %v", s.sheetName, head.Name(), fkSheetName))
+						slog.Error(fmt.Sprintf("[%v.%v]check foreign key fail, sheet not found: %v", s.sheetName, head.Name(), fkSheetName))
 					}
 
-					// 检测外键的字段值是否存在
+					// 检测外键的字段值是否存在（支持repeated）
 					refSheetParser := root.getSheetParser(fkSheetName)
 					for rowIndex := range s.data {
 						thisValue := s.getFiledValue(head.Name(), int32(rowIndex))
-						if !refSheetParser.hasExistFiledValue(fkFiledName, thisValue) {
-							panic(fmt.Sprintf("[%v.%v]check foreign key fail, ref value is excel row=%v, value=%v, not found: %v.%v",
-								s.sheetName, head.Name(),
-								DataRowIndex2ExcelRow(int32(rowIndex)), thisValue, fkSheetName, fkFiledName))
+						values := SplitBaseValue(thisValue)
+						for _, checkValue := range values {
+							if !refSheetParser.hasExistFiledValue(fkFiledName, checkValue) {
+								slog.Error(fmt.Sprintf("[%v.%v]check foreign key fail, ref value is excel row=%v, failValue=%v, value=%v, not found: %v.%v",
+									s.sheetName, head.Name(),
+									DataRowIndex2ExcelRow(int32(rowIndex)), checkValue, thisValue, fkSheetName, fkFiledName))
+							}
 						}
 					}
 
