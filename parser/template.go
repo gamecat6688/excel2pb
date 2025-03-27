@@ -13,7 +13,7 @@ import {{.ProtoPath}}
 {{end}}
 
 message {{.SheetName}}Config {
-  repeated {{.SheetName}} Data = 1;
+  repeated {{.SheetName}} Records = 1;
 }
 
 message {{.SheetName}} {

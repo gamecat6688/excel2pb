@@ -3,6 +3,7 @@ package parser
 import (
 	"fmt"
 	"google.golang.org/protobuf/types/descriptorpb"
+	"strconv"
 	"strings"
 )
 
@@ -13,6 +14,24 @@ func SplitEnumName(sheetName string) string {
 	return ss[0]
 }
 
+// SplitBaseValue 一维数组
+// ab;df;asd
+func SplitBaseValue(str string) []string {
+	ss := strings.Split(str, ";")
+	return ss
+}
+
+// SplitCustomValue 二维数组
+// 100|1;101|2;103|5
+func SplitCustomValue(str string) (rv [][]string) {
+	abab := strings.Split(str, ";")
+	for _, ab := range abab {
+		ss := strings.Split(ab, "|")
+		rv = append(rv, ss)
+	}
+	return
+}
+
 // DataRowIndex2ExcelRow 数据的行下标，转换为excel的行数
 func DataRowIndex2ExcelRow(rowIndex int32) int32 {
 	return DataRow2ExcelRow(rowIndex) + 1
@@ -21,6 +40,27 @@ func DataRowIndex2ExcelRow(rowIndex int32) int32 {
 // DataRow2ExcelRow 数据的行下标，转换为excel的行数
 func DataRow2ExcelRow(row int32) int32 {
 	return row + HeadCount
+}
+
+func TypeNameToValue(typeName string, value string) interface{} {
+	switch typeName {
+	case "string", I18nName:
+		v := value
+		return v
+	case "int32":
+		v, _ := strconv.ParseInt(value, 10, 23)
+		return int32(v)
+	case "int64":
+		v, _ := strconv.ParseInt(value, 10, 64)
+		return v
+	case "float", "double":
+		v, _ := strconv.ParseFloat(value, 10)
+		return v
+	case "bool":
+		v, _ := strconv.ParseBool(value)
+		return v
+	}
+	return 0
 }
 
 func ProtoType(goType string) (*descriptorpb.FieldDescriptorProto_Type, error) {

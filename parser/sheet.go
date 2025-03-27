@@ -69,6 +69,11 @@ func (s *SheetParser) GetFieldColIndex(name string) int32 {
 	return s.headersIndexes[name]
 }
 
+// GetFieldColIndex 获得指定字段名的列索引
+func (s *SheetParser) GetField(colIndex int32) Head {
+	return s.headers[colIndex]
+}
+
 func (s *SheetParser) Parse(f *excelize.File) bool {
 	rows, _ := f.GetRows(s.sheetName)
 	s.parseHeader(rows)
@@ -294,27 +299,23 @@ func (s *SheetParser) SplitByFilter(filterName string) *SheetParser {
 }
 
 func (s *SheetParser) getPackageName() string {
-	if s.IsClient() {
-		return config.ClientProtoPackage
-	}
-
-	if s.IsServer() {
-		return config.ServerProtoPackage
-	}
-
-	return ""
+	return config.ProtoPackages[s.filter]
 }
 
 func (s *SheetParser) getProtoOutPath() string {
-	if s.IsClient() {
-		return config.ClientOutProtoPath
-	}
+	return config.ProtoOutPaths[s.filter]
+}
 
-	if s.IsServer() {
-		return config.ServerOutProtoPath
-	}
+func (s *SheetParser) getDataOutPath() string {
+	return config.DataOutPaths[s.filter]
+}
 
-	return ""
+func (s *SheetParser) getDataExtension() string {
+	return config.DataExtensions[s.filter]
+}
+
+func (s *SheetParser) getDataFilePath() string {
+	return filepath.Join(s.getDataOutPath(), s.sheetName+s.getDataExtension())
 }
 
 func (s *SheetParser) getProtoFilePath() string {
@@ -323,6 +324,22 @@ func (s *SheetParser) getProtoFilePath() string {
 
 func (s *SheetParser) getProtoName() string {
 	return s.sheetName + ".proto"
+}
+
+func (s *SheetParser) getImportMessages(root *Parser) (rv []string) {
+	exists := map[string]bool{}
+	for _, v := range s.headers {
+		baseType := v.BaseType()
+		if root.hasSheetParser(baseType) {
+			_, ok := exists[baseType]
+			if !ok {
+				rv = append(rv, baseType)
+				exists[baseType] = true
+			}
+		}
+	}
+
+	return
 }
 
 // import "playerstate/ExampleNonBasicPart.proto";
@@ -334,20 +351,21 @@ func (s *SheetParser) ExportProto(root *Parser) {
 		return
 	}
 
-	// 数据驱动模板
 	m := &ProtoModel{
 		PackageName: s.getPackageName(),
 		SheetName:   s.sheetName,
 	}
-	for t, v := range s.headers {
-		baseType := v.BaseType()
-		if root.hasSheetParser(baseType) {
-			// 引用其他proto
-			m.Imports = append(m.Imports, ImportModel{
-				ProtoPath: fmt.Sprintf(`"%v%v.proto";`, config.ProtoImportPath, baseType),
-			})
-		}
 
+	// 数据驱动模板
+	importMessages := s.getImportMessages(root)
+	for _, v := range importMessages {
+		// 引用其他proto
+		m.Imports = append(m.Imports, ImportModel{
+			ProtoPath: fmt.Sprintf(`"%v%v.proto";`, config.ProtoImportPath, v),
+		})
+	}
+
+	for t, v := range s.headers {
 		m.Fields = append(m.Fields, FieldModel{
 			ProtoType: v.ProtoType(),
 			FieldName: v.Name(),
@@ -359,6 +377,7 @@ func (s *SheetParser) ExportProto(root *Parser) {
 	// 创建proto文件
 	outPath := s.getProtoOutPath()
 	os.MkdirAll(outPath, os.ModePerm)
+
 	f, err := os.Create(s.getProtoFilePath())
 	if err != nil {
 		slog.Error("create proto file fail", "error", err)
@@ -378,34 +397,98 @@ func (s *SheetParser) ExportData(root *Parser) {
 		return
 	}
 
+	// 获得当前表格所有的proto文件，包含依赖文件
+	var protoNames []string
+	protoNames = append(protoNames, s.getProtoName())
+	importMessages := s.getImportMessages(root)
+	for _, v := range importMessages {
+		protoNames = append(protoNames, v+".proto")
+	}
+
 	// 1. 解析 .proto 文件
 	parser := protoparse.Parser{}
-	parser.InferImportPaths = true
 	parser.ImportPaths = []string{
 		s.getProtoOutPath(),
 	}
-	fileDescriptors, err := parser.ParseFiles(s.getProtoName())
+	fileDescriptors, err := parser.ParseFiles(protoNames...)
 	if err != nil {
 		panic(err)
 	}
 
 	// 2. 获取消息描述符
-	messageName := fmt.Sprintf("%v.%v", s.getPackageName(), s.sheetName)
-	msgDesc := fileDescriptors[0].FindMessage(messageName)
+	configMsgName := fmt.Sprintf("%v.%v", s.getPackageName(), s.sheetName)
+	configDesc := fileDescriptors[0].FindMessage(configMsgName + "Config")
+	recordDesc := fileDescriptors[0].FindMessage(configMsgName)
+	//resourceDesc := fileDescriptors[1].FindMessage(configMsgName)
+	//_ = resourceDesc
+
+	// 5. 构造多个 record 数据
+	var records []*dynamic.Message
+	for _, row := range s.data {
+		record := dynamic.NewMessage(recordDesc)
+
+		for colIdx, value := range row {
+			fd := s.GetField(int32(colIdx))
+
+			if fd.IsRepeated() {
+				// 数组
+				if fd.IsCustom(root) {
+					// TODO
+					root = root
+				} else {
+					var arrValue []interface{}
+					for _, v := range SplitBaseValue(value) {
+						arrValue = append(arrValue, TypeNameToValue(fd.BaseType(), v))
+					}
+					record.SetFieldByName(fd.Name(), arrValue)
+				}
+			} else {
+				// 变量
+				if fd.IsCustom(root) {
+					// TODO
+					root = root
+				} else {
+					record.SetFieldByName(fd.Name(), TypeNameToValue(fd.BaseType(), value))
+				}
+			}
+
+			// 构造 Cost（多个 Resource）
+			//var resources []*dynamic.Message
+			//for j := 0; j < 2; j++ {
+			//	resource := dynamic.NewMessage(resourceDesc)
+			//	resource.SetFieldByName("Id", int32(j+1))
+			//	resource.SetFieldByName("Amount", int32((j+1)*100))
+			//	resources = append(resources, resource)
+			//}
+			//record.SetFieldByName("Cost", resources)
+		}
+
+		records = append(records, record)
+	}
+
+	//msgDesc := fileDescriptors[0].FindMessage(messageName)
+	//if len(fileDescriptors) > 1 {
+	//	msgDesc = fileDescriptors[1].FindMessage("pb.Resource")
+	//}
 
 	// 3. 创建动态消息并填充数据
-	dynamicMsg := dynamic.NewMessage(msgDesc)
-	dynamicMsg.SetFieldByName("name", "John")
-	dynamicMsg.SetFieldByName("age", int32(30))
+	configMsg := dynamic.NewMessage(configDesc)
+	//dynamicMsg.SetFieldByName("name", "John")
+	//dynamicMsg.SetFieldByName("age", int32(30))
+
+	configMsg.SetFieldByName("Records", records)
 
 	// 4. 序列化
-	data, err := dynamicMsg.Marshal()
+	data, err := configMsg.Marshal()
 	if err != nil {
 		panic(err)
 	}
 
-	fmt.Println("data: ", data)
+	outPath := s.getDataOutPath()
+	os.MkdirAll(outPath, os.ModePerm)
 
+	dataFilePath := s.getDataFilePath()
+	os.WriteFile(dataFilePath, data, os.ModePerm)
 }
 
 func (s *SheetParser) buildDatasetDescriptor() (*desc.MessageDescriptor, error) {
