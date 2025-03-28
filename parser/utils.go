@@ -3,6 +3,7 @@ package parser
 import (
 	"fmt"
 	"github.com/jhump/protoreflect/desc"
+	"google.golang.org/protobuf/reflect/protoreflect"
 	"strconv"
 	"strings"
 )
@@ -114,6 +115,36 @@ func TypeNameToValue(root *Parser, fdDesc *desc.FieldDescriptor, sheetName strin
 		}
 	}
 	return 0
+}
+
+func TypeNameToValueV2(root *Parser, sheetName string, headName string, typeName string, value string) protoreflect.Value {
+	switch typeName {
+	case "string", I18nName:
+		v := value
+		return protoreflect.ValueOfString(v)
+	case "int32":
+		v, _ := strconv.ParseInt(value, 10, 23)
+		return protoreflect.ValueOfInt32(int32(v))
+	case "int64":
+		v, _ := strconv.ParseInt(value, 10, 64)
+		return protoreflect.ValueOfInt64(v)
+	case "float", "double":
+		v, _ := strconv.ParseFloat(value, 10)
+		return protoreflect.ValueOfFloat64(v)
+	case "bool":
+		v, _ := strconv.ParseBool(value)
+		return protoreflect.ValueOfBool(v)
+	default:
+		//if root.hasEnumParser(typeName) {
+		//	v, _ := strconv.ParseInt(value, 10, 64)
+		//	enumDesc := fdDesc.GetEnumType().FindValueByNumber(int32(v))
+		//	return enumDesc
+		//} else {
+		//	panic(fmt.Sprintf("[%v.%v]not support type %v", sheetName, headName, typeName))
+		//	return nil
+		//}
+	}
+	return protoreflect.ValueOf(0)
 }
 
 //func ProtoType(goType string) (*descriptorpb.FieldDescriptorProto_Type, error) {

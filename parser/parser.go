@@ -194,7 +194,8 @@ func (p *Parser) exportData() {
 	for _, v := range p.sheets {
 		for _, f := range AllFilters {
 			ns := v.SplitByFilter(f)
-			ns.ExportData(p)
+			//ns.ExportData(p)
+			ns.ExportDataV2(p)
 		}
 	}
 }

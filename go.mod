@@ -3,14 +3,15 @@ module excel2pb
 go 1.22.10
 
 require (
-	github.com/jhump/protoreflect v1.17.0
+	github.com/bufbuild/protocompile v0.14.1
+	github.com/jhump/protoreflect v1.17.1-0.20240913204751-8f5fd1dcb3c5
 	github.com/xuri/excelize/v2 v2.9.0
 	google.golang.org/protobuf v1.36.6
 )
 
 require (
-	github.com/bufbuild/protocompile v0.14.1 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
+	github.com/jhump/protoreflect/v2 v2.0.0-beta.2 // indirect
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826 // indirect
 	github.com/richardlehane/mscfb v1.0.4 // indirect
 	github.com/richardlehane/msoleps v1.0.4 // indirect
