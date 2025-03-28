@@ -477,12 +477,6 @@ func (s *SheetParser) ExportData(root *Parser) {
 		log.Fatal(err)
 	}
 
-	// 构建一个索引map，key is proto name
-	//indexesFileDescriptors := make(map[string]*desc.FileDescriptor)
-	//for _, v := range fileDescriptors {
-	//	indexesFileDescriptors[v.GetName()] = v
-	//}
-
 	// 2. 获取消息描述符
 	configMsgName := fmt.Sprintf("%v.%v", s.getPackageName(), s.sheetName)
 	configMsgType, err := getMessageType(resolver, configMsgName+"Config")

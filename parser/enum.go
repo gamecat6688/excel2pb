@@ -113,9 +113,3 @@ func (s *EnumParser) ExportProto(filter string) {
 		return
 	}
 }
-
-//type color int32
-//
-//var Color = struct {
-//	Red, Green, Blue color
-//}{1, 2, 3}
