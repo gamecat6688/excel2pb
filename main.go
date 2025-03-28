@@ -1,7 +1,11 @@
 package main
 
 import (
+	"excel2pb/assets/out_pb/server/pbs"
 	"excel2pb/parser"
+	"fmt"
+	"google.golang.org/protobuf/proto"
+	"os"
 )
 
 func main() {
@@ -9,13 +13,14 @@ func main() {
 	p.ParseExcels()
 	p.Export()
 
-	//data, err := os.ReadFile("assets/out_data/server/Upgrade.data")
-	//if err != nil {
-	//	panic(err)
-	//}
-	//cfg := &pbs.UpgradeConfig{}
-	//proto.Unmarshal(data, cfg)
-	//fmt.Printf("cfg: %v\n", cfg)
+	// 测试生成后的反序列化
+	data, err := os.ReadFile("assets/out_data/server/Upgrade.data")
+	if err != nil {
+		panic(err)
+	}
+	cfg := &pbs.UpgradeConfig{}
+	proto.Unmarshal(data, cfg)
+	fmt.Printf("cfg: %v\n", cfg)
 
 	//if RewriteI18nExcel {
 	//	// 回写多语言表格
