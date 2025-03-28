@@ -39,6 +39,24 @@ func ToInt64(val string) int64 {
 	return rv
 }
 
+func ToFloat64(val string) float64 {
+	rv, err := strconv.ParseFloat(val, 10)
+	if err != nil {
+		return 0
+	}
+
+	return rv
+}
+
+func ToBool(val string) bool {
+	rv, err := strconv.ParseBool(val)
+	if err != nil {
+		return false
+	}
+
+	return rv
+}
+
 // SplitEnumName 分割枚举表名, 去掉Enum后缀
 // 如: ItemType_Enum -> ItemType
 func SplitEnumName(sheetName string) string {
@@ -120,31 +138,24 @@ func TypeNameToValue(root *Parser, fdDesc *desc.FieldDescriptor, sheetName strin
 func TypeNameToValueV2(root *Parser, sheetName string, headName string, typeName string, value string) protoreflect.Value {
 	switch typeName {
 	case "string", I18nName:
-		v := value
-		return protoreflect.ValueOfString(v)
+		return protoreflect.ValueOfString(value)
 	case "int32":
-		v, _ := strconv.ParseInt(value, 10, 23)
-		return protoreflect.ValueOfInt32(int32(v))
+		return protoreflect.ValueOfInt32(ToInt32(value))
 	case "int64":
-		v, _ := strconv.ParseInt(value, 10, 64)
-		return protoreflect.ValueOfInt64(v)
+		return protoreflect.ValueOfInt64(ToInt64(value))
 	case "float", "double":
-		v, _ := strconv.ParseFloat(value, 10)
-		return protoreflect.ValueOfFloat64(v)
+		return protoreflect.ValueOfFloat64(ToFloat64(value))
 	case "bool":
-		v, _ := strconv.ParseBool(value)
-		return protoreflect.ValueOfBool(v)
+		return protoreflect.ValueOfBool(ToBool(value))
 	default:
-		//if root.hasEnumParser(typeName) {
-		//	v, _ := strconv.ParseInt(value, 10, 64)
-		//	enumDesc := fdDesc.GetEnumType().FindValueByNumber(int32(v))
-		//	return enumDesc
-		//} else {
-		//	panic(fmt.Sprintf("[%v.%v]not support type %v", sheetName, headName, typeName))
-		//	return nil
-		//}
+		if root.hasEnumParser(typeName) {
+			return protoreflect.ValueOfEnum(protoreflect.EnumNumber(ToInt32(value)))
+		} else {
+			panic(fmt.Sprintf("[%v.%v]not support type %v", sheetName, headName, typeName))
+		}
 	}
-	return protoreflect.ValueOf(0)
+
+	return protoreflect.ValueOf(nil)
 }
 
 //func ProtoType(goType string) (*descriptorpb.FieldDescriptorProto_Type, error) {
