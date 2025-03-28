@@ -1,23 +1,38 @@
 package parser
 
 const (
-	ProtoTemplate = `
+	ProtoMessageTemplate = `
 syntax = "proto3";
 package {{.PackageName}};
 
 option csharp_namespace = "{{.PackageName}}";
 option go_package = "/{{.PackageName}}";
 
-{{range .Imports}}
-import {{.ProtoPath}}
-{{end}}
+{{range .Imports}}import {{.ProtoPath}}{{end}}
 
-message {{.SheetName}}Config {
-  repeated {{.SheetName}} Records = 1;
+message {{.MessageName}}Config {
+  repeated {{.MessageName}} Records = 1;
 }
 
-message {{.SheetName}} {
+message {{.MessageName}} {
 {{range .Fields}}  {{.ProtoType}} {{.FieldName}} = {{.FieldTag}}; // {{.Comment}}
+{{end}}
+}
+`
+)
+
+const (
+	ProtoEnumTemplate = `
+syntax = "proto3";
+package {{.PackageName}};
+
+option csharp_namespace = "{{.PackageName}}";
+option go_package = "/{{.PackageName}}";
+
+
+enum {{.MessageName}}
+{
+{{range .Fields}}  {{.FieldName}} = {{.FieldTag}}; // {{.Comment}}
 {{end}}
 }
 `
@@ -30,12 +45,19 @@ type ImportModel struct {
 type FieldModel struct {
 	ProtoType string
 	FieldName string
-	FieldTag  int
+	FieldTag  int32
 	Comment   string
 }
-type ProtoModel struct {
+type ProtoMessageModel struct {
 	PackageName string
-	SheetName   string
+	MessageName string
+	Imports     []ImportModel
+	Fields      []FieldModel
+}
+
+type ProtoEnumModel struct {
+	PackageName string
+	MessageName string
 	Imports     []ImportModel
 	Fields      []FieldModel
 }

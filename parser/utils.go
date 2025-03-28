@@ -2,10 +2,41 @@ package parser
 
 import (
 	"fmt"
-	"google.golang.org/protobuf/types/descriptorpb"
+	"github.com/jhump/protoreflect/desc"
 	"strconv"
 	"strings"
 )
+
+func ToString(val interface{}) string {
+	return fmt.Sprintf("%v", val)
+}
+
+func ToInt(val string) int {
+	rv, err := strconv.ParseInt(val, 10, 0)
+	if err != nil {
+		return 0
+	}
+
+	return int(rv)
+}
+
+func ToInt32(val string) int32 {
+	rv, err := strconv.ParseInt(val, 10, 0)
+	if err != nil {
+		return 0
+	}
+
+	return int32(rv)
+}
+
+func ToInt64(val string) int64 {
+	rv, err := strconv.ParseInt(val, 10, 0)
+	if err != nil {
+		return 0
+	}
+
+	return rv
+}
 
 // SplitEnumName 分割枚举表名, 去掉Enum后缀
 // 如: ItemType_Enum -> ItemType
@@ -55,7 +86,7 @@ func DataRow2ExcelRow(row int32) int32 {
 	return row + HeadCount
 }
 
-func TypeNameToValue(typeName string, value string) interface{} {
+func TypeNameToValue(root *Parser, fdDesc *desc.FieldDescriptor, sheetName string, headName string, typeName string, value string) interface{} {
 	switch typeName {
 	case "string", I18nName:
 		v := value
@@ -72,25 +103,34 @@ func TypeNameToValue(typeName string, value string) interface{} {
 	case "bool":
 		v, _ := strconv.ParseBool(value)
 		return v
+	default:
+		if root.hasEnumParser(typeName) {
+			v, _ := strconv.ParseInt(value, 10, 64)
+			enumDesc := fdDesc.GetEnumType().FindValueByNumber(int32(v))
+			return enumDesc
+		} else {
+			panic(fmt.Sprintf("[%v.%v]not support type %v", sheetName, headName, typeName))
+			return nil
+		}
 	}
 	return 0
 }
 
-func ProtoType(goType string) (*descriptorpb.FieldDescriptorProto_Type, error) {
-	switch goType {
-	case "string":
-		return descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum(), nil
-	case "int32":
-		return descriptorpb.FieldDescriptorProto_TYPE_INT32.Enum(), nil
-	case "int64":
-		return descriptorpb.FieldDescriptorProto_TYPE_INT64.Enum(), nil
-	case "float":
-		return descriptorpb.FieldDescriptorProto_TYPE_FLOAT.Enum(), nil
-	case "double":
-		return descriptorpb.FieldDescriptorProto_TYPE_DOUBLE.Enum(), nil
-	case "bool":
-		return descriptorpb.FieldDescriptorProto_TYPE_BOOL.Enum(), nil
-	default:
-		return nil, fmt.Errorf("不支持的类型: %s", goType)
-	}
-}
+//func ProtoType(goType string) (*descriptorpb.FieldDescriptorProto_Type, error) {
+//	switch goType {
+//	case "string":
+//		return descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum(), nil
+//	case "int32":
+//		return descriptorpb.FieldDescriptorProto_TYPE_INT32.Enum(), nil
+//	case "int64":
+//		return descriptorpb.FieldDescriptorProto_TYPE_INT64.Enum(), nil
+//	case "float":
+//		return descriptorpb.FieldDescriptorProto_TYPE_FLOAT.Enum(), nil
+//	case "double":
+//		return descriptorpb.FieldDescriptorProto_TYPE_DOUBLE.Enum(), nil
+//	case "bool":
+//		return descriptorpb.FieldDescriptorProto_TYPE_BOOL.Enum(), nil
+//	default:
+//		return nil, fmt.Errorf("不支持的类型: %s", goType)
+//	}
+//}

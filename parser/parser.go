@@ -6,6 +6,8 @@ import (
 	"github.com/xuri/excelize/v2"
 	"log"
 	"log/slog"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -127,6 +129,12 @@ func (p *Parser) checks() {
 }
 
 func (p *Parser) exportProto() {
+	for _, v := range p.enums {
+		for _, f := range AllFilters {
+			v.ExportProto(f)
+		}
+	}
+
 	for _, v := range p.sheets {
 		for _, f := range AllFilters {
 			ns := v.SplitByFilter(f)
@@ -137,12 +145,49 @@ func (p *Parser) exportProto() {
 
 // exportPb 导出pb
 func (p *Parser) exportPb() {
-	for _, v := range p.sheets {
-		for _, f := range AllFilters {
-			ns := v.SplitByFilter(f)
-			ns.ExportPb(p)
+	for filter, protoOutPath := range config.ProtoOutPaths {
+		// make dirs
+		pbOutPath := config.PbOutPaths[filter]
+		os.MkdirAll(pbOutPath, os.ModePerm)
+
+		sss, err := filepath.Glob(fmt.Sprintf("%v/*.proto", protoOutPath))
+		if err != nil {
+			log.Println("err:", err)
+			return
+		}
+
+		lan := config.GenerateLanguage[filter]
+
+		for _, filename := range sss {
+			argInclude := fmt.Sprintf("--proto_path=%v", protoOutPath)
+			argOut := ""
+
+			switch lan {
+			case "golang":
+				argOut = fmt.Sprintf("--go_out=%v", pbOutPath)
+			case "csharp":
+				argOut = fmt.Sprintf("--csharp_out=%v", pbOutPath)
+			case "java":
+				argOut = fmt.Sprintf("--java_out=%v", pbOutPath)
+			case "cpp":
+				argOut = fmt.Sprintf("--cpp_out=%v", pbOutPath)
+			}
+
+			cmd := exec.Command("protoc", argInclude, argOut, filename)
+			err = cmd.Run()
+			if err != nil {
+				slog.Error("protoc failed", "error", err)
+				//log.Fatalf("protoc failed: %v", err)
+			}
 		}
 	}
+
+	//for _, v := range p.sheets {
+	//	for _, f := range AllFilters {
+	//		ns := v.SplitByFilter(f)
+	//		ns.ExportPb(p)
+	//	}
+	//}
 }
 
 func (p *Parser) exportData() {
