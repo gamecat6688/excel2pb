@@ -98,9 +98,14 @@ func (h Head) IsRepeated() bool {
 	return strings.Index(h.Type(), RepeatedName) != -1
 }
 
-// IsCustom 是否自定义结构
-func (h Head) IsCustom(root *Parser) bool {
+// IsCustomMessage 是否自定义message结构
+func (h Head) IsCustomMessage(root *Parser) bool {
 	return root.hasSheetParser(h.BaseType())
+}
+
+// IsCustomEnum 是否自定义枚举
+func (h Head) IsCustomEnum(root *Parser) bool {
+	return root.hasEnumParser(h.BaseType())
 }
 
 // IsI18n 是否多语言字段

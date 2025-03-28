@@ -1,7 +1,12 @@
 package parser
 
 import (
+	"excel2pb/config"
 	"github.com/xuri/excelize/v2"
+	"log/slog"
+	"os"
+	"path/filepath"
+	"text/template"
 )
 
 /*
@@ -55,6 +60,58 @@ func (s *EnumParser) Parse(f *excelize.File) bool {
 	}
 
 	return true
+}
+
+func (s *EnumParser) getProtoOutPath(filter string) string {
+	return config.ProtoOutPaths[filter]
+}
+
+func (s *EnumParser) getProtoFilePath(filter string) string {
+	return filepath.Join(s.getProtoOutPath(filter), s.getProtoName())
+}
+
+func (s *EnumParser) getProtoName() string {
+	return s.name + ".proto"
+}
+
+func (s *EnumParser) ExportProto(filter string) {
+	// 解析模板
+	tmpl, err := template.New("proto").Parse(ProtoEnumTemplate)
+	if err != nil {
+		slog.Error("parse proto enum template fail", "error", err)
+		return
+	}
+
+	m := &ProtoEnumModel{
+		PackageName: config.ProtoPackages[filter],
+		MessageName: s.name,
+	}
+
+	// 数据驱动模板
+	for _, v := range s.enums {
+		m.Fields = append(m.Fields, FieldModel{
+			FieldName: v.Name,
+			FieldTag:  ToInt32(v.Value),
+			Comment:   v.Comment,
+		})
+	}
+
+	// 创建proto文件
+	outPath := s.getProtoOutPath(filter)
+	os.MkdirAll(outPath, os.ModePerm)
+
+	f, err := os.Create(s.getProtoFilePath(filter))
+	if err != nil {
+		slog.Error("create proto file fail", "error", err)
+		return
+	}
+
+	// 执行模板,输出文件
+	err = tmpl.Execute(f, m)
+	if err != nil {
+		slog.Error("tmpl.Execute fail", "error", err)
+		return
+	}
 }
 
 //type color int32

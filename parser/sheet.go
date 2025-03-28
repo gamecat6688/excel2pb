@@ -7,10 +7,8 @@ import (
 	"github.com/jhump/protoreflect/desc/protoparse"
 	"github.com/jhump/protoreflect/dynamic"
 	"github.com/xuri/excelize/v2"
-	"log"
 	"log/slog"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -367,7 +365,7 @@ func (s *SheetParser) getImportMessages(root *Parser) (rv []string) {
 	exists := map[string]bool{}
 	for _, v := range s.headers {
 		baseType := v.BaseType()
-		if root.hasSheetParser(baseType) {
+		if root.hasSheetParser(baseType) || root.hasEnumParser(baseType) {
 			_, ok := exists[baseType]
 			if !ok {
 				rv = append(rv, baseType)
@@ -382,15 +380,15 @@ func (s *SheetParser) getImportMessages(root *Parser) (rv []string) {
 // import "playerstate/ExampleNonBasicPart.proto";
 func (s *SheetParser) ExportProto(root *Parser) {
 	// 解析模板
-	tmpl, err := template.New("proto").Parse(ProtoTemplate)
+	tmpl, err := template.New("proto").Parse(ProtoMessageTemplate)
 	if err != nil {
-		slog.Error("parse proto template fail", "error", err)
+		slog.Error("parse proto message template fail", "error", err)
 		return
 	}
 
-	m := &ProtoModel{
+	m := &ProtoMessageModel{
 		PackageName: s.getPackageName(),
-		SheetName:   s.sheetName,
+		MessageName: s.sheetName,
 	}
 
 	// 数据驱动模板
@@ -406,7 +404,7 @@ func (s *SheetParser) ExportProto(root *Parser) {
 		m.Fields = append(m.Fields, FieldModel{
 			ProtoType: v.ProtoType(),
 			FieldName: v.Name(),
-			FieldTag:  t + 1,
+			FieldTag:  int32(t) + 1,
 			Comment:   v.Desc(),
 		})
 	}
@@ -430,31 +428,31 @@ func (s *SheetParser) ExportProto(root *Parser) {
 }
 
 // 例子： protoc --proto_path=".\assets\out_proto\server" --go_out=".\assets\out_pb\server" "assets\out_proto\server\Item.proto"
-func (s *SheetParser) ExportPb(root *Parser) {
-	// make dirs
-	outPath := s.getPbOutPath()
-	os.MkdirAll(outPath, os.ModePerm)
-
-	argInclude := fmt.Sprintf("--proto_path=%v", s.getProtoOutPath())
-	argOut := ""
-
-	switch s.getGenerateLanguage() {
-	case "golang":
-		argOut = fmt.Sprintf("--go_out=%v", s.getPbOutPath())
-	case "csharp":
-		argOut = fmt.Sprintf("--csharp_out=%v", s.getPbOutPath())
-	case "java":
-		argOut = fmt.Sprintf("--java_out=%v", s.getPbOutPath())
-	case "cpp":
-		argOut = fmt.Sprintf("--cpp_out=%v", s.getPbOutPath())
-	}
-
-	cmd := exec.Command("protoc", argInclude, argOut, s.getProtoFilePath())
-	err := cmd.Run()
-	if err != nil {
-		log.Fatalf("protoc failed: %v", err)
-	}
-}
+//func (s *SheetParser) ExportPb(root *Parser) {
+//	// make dirs
+//	outPath := s.getPbOutPath()
+//	os.MkdirAll(outPath, os.ModePerm)
+//
+//	argInclude := fmt.Sprintf("--proto_path=%v", s.getProtoOutPath())
+//	argOut := ""
+//
+//	switch s.getGenerateLanguage() {
+//	case "golang":
+//		argOut = fmt.Sprintf("--go_out=%v", s.getPbOutPath())
+//	case "csharp":
+//		argOut = fmt.Sprintf("--csharp_out=%v", s.getPbOutPath())
+//	case "java":
+//		argOut = fmt.Sprintf("--java_out=%v", s.getPbOutPath())
+//	case "cpp":
+//		argOut = fmt.Sprintf("--cpp_out=%v", s.getPbOutPath())
+//	}
+//
+//	cmd := exec.Command("protoc", argInclude, argOut, s.getProtoFilePath())
+//	err := cmd.Run()
+//	if err != nil {
+//		log.Fatalf("protoc failed: %v", err)
+//	}
+//}
 
 func (s *SheetParser) ExportData(root *Parser) {
 	if !s.HasData() {
@@ -476,7 +474,8 @@ func (s *SheetParser) ExportData(root *Parser) {
 	}
 	fileDescriptors, err := parser.ParseFiles(protoNames...)
 	if err != nil {
-		panic(err)
+		slog.Error("parse proto fail", "protoNames", protoNames, "error", err)
+		return
 	}
 
 	// 构建一个索引map，key is proto name
@@ -497,16 +496,20 @@ func (s *SheetParser) ExportData(root *Parser) {
 
 		for colIdx, value := range row {
 			fd := s.GetFiled(int32(colIdx))
-			if fd.IsCustom(root) {
-				ds := indexesFileDescriptors[fd.BaseType()+".proto"]
-				customs := s.procCustomProtoType(root, ds, fd, value)
+			if fd.IsCustomMessage(root) {
+				// message字段
+				fieldDesc := record.GetMessageDescriptor().FindFieldByName(fd.Name())
+				fileDesc := indexesFileDescriptors[fd.BaseType()+".proto"]
+				customs := s.procCustomProtoType(root, fileDesc, fieldDesc, fd, value)
 				if fd.IsRepeated() {
 					record.SetFieldByName(fd.Name(), customs)
 				} else if customs != nil {
 					record.SetFieldByName(fd.Name(), customs[0])
 				}
 			} else {
-				arrValue := s.procBaseProtoType(fd, value)
+				// 基础类型和enum字段
+				fieldDesc := record.GetMessageDescriptor().FindFieldByName(fd.Name())
+				arrValue := s.procBaseProtoType(root, fieldDesc, fd, value)
 				if fd.IsRepeated() {
 					record.SetFieldByName(fd.Name(), arrValue)
 				} else if arrValue != nil {
@@ -537,27 +540,27 @@ func (s *SheetParser) ExportData(root *Parser) {
 	os.WriteFile(dataFilePath, data, os.ModePerm)
 }
 
-func (s *SheetParser) procBaseProtoType(fd Head, value string) []interface{} {
+func (s *SheetParser) procBaseProtoType(root *Parser, fdDesc *desc.FieldDescriptor, fd Head, value string) []interface{} {
 	var arrValue []interface{}
 	for _, v := range SplitBaseValue(value) {
-		arrValue = append(arrValue, TypeNameToValue(fd.BaseType(), v))
+		arrValue = append(arrValue, TypeNameToValue(root, fdDesc, s.sheetName, fd.Name(), fd.BaseType(), v))
 	}
 	return arrValue
 }
 
-func (s *SheetParser) procCustomProtoType(root *Parser, ds *desc.FileDescriptor, fd Head, value string) []*dynamic.Message {
+func (s *SheetParser) procCustomProtoType(root *Parser, fileDesc *desc.FileDescriptor, fdDesc *desc.FieldDescriptor, fd Head, value string) []*dynamic.Message {
 	var customs []*dynamic.Message
 
 	customParser := root.getSheetParser(fd.BaseType())
 	msgName := fmt.Sprintf("%v.%v", s.getPackageName(), fd.BaseType())
-	customDesc := ds.FindMessage(msgName)
+	customDesc := fileDesc.FindMessage(msgName)
 	// 构造多个子结构
 	customRows := SplitCustomValue(value)
 	for _, customRow := range customRows {
 		customMsg := dynamic.NewMessage(customDesc)
 		for idx, subValue := range customRow {
 			subFd := customParser.GetFiled(int32(idx))
-			customMsg.SetFieldByName(subFd.Name(), TypeNameToValue(subFd.BaseType(), subValue))
+			customMsg.SetFieldByName(subFd.Name(), TypeNameToValue(root, fdDesc, s.sheetName, subFd.Name(), subFd.BaseType(), subValue))
 		}
 		customs = append(customs, customMsg)
 	}
