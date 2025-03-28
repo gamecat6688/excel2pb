@@ -3,9 +3,6 @@ package parser
 import (
 	"excel2pb/config"
 	"fmt"
-	"github.com/jhump/protoreflect/desc"
-	"github.com/jhump/protoreflect/desc/protoparse"
-	"github.com/jhump/protoreflect/dynamic"
 	"github.com/xuri/excelize/v2"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -468,7 +465,7 @@ func (s *SheetParser) ExportProto(root *Parser) {
 //	}
 //}
 
-func (s *SheetParser) ExportDataV2(root *Parser) {
+func (s *SheetParser) ExportData(root *Parser) {
 	if !s.HasData() {
 		return
 	}
@@ -513,7 +510,7 @@ func (s *SheetParser) ExportDataV2(root *Parser) {
 					log.Fatal(err2)
 				}
 
-				customs := s.procCustomProtoTypeV2(root, subMsgType, fd, value)
+				customs := s.procCustomProtoType(root, subMsgType, fd, value)
 				if fd.IsRepeated() {
 					fdList := record.Mutable(pbField).List()
 					for _, val := range customs {
@@ -524,7 +521,7 @@ func (s *SheetParser) ExportDataV2(root *Parser) {
 				}
 			} else {
 				// 基础类型和enum字段
-				arrValues := s.procBaseProtoTypeV2(root, fd, value)
+				arrValues := s.procBaseProtoType(root, fd, value)
 				if fd.IsRepeated() {
 					fdList := record.Mutable(pbField).List()
 					for _, val := range arrValues {
@@ -562,124 +559,15 @@ func (s *SheetParser) ExportDataV2(root *Parser) {
 	os.WriteFile(dataFilePath, data, os.ModePerm)
 }
 
-func (s *SheetParser) ExportData(root *Parser) {
-	if !s.HasData() {
-		return
-	}
-
-	// 获得当前表格所有的proto文件，包含依赖文件
-	protoNames := s.getAllProtoFiles(root)
-
-	// 1. 解析 .proto 文件
-	parser := protoparse.Parser{}
-	parser.ImportPaths = []string{
-		s.getProtoOutPath(),
-	}
-	fileDescriptors, err := parser.ParseFiles(protoNames...)
-	if err != nil {
-		slog.Error("parse proto fail", "protoNames", protoNames, "error", err)
-		return
-	}
-
-	// 构建一个索引map，key is proto name
-	indexesFileDescriptors := make(map[string]*desc.FileDescriptor)
-	for _, v := range fileDescriptors {
-		indexesFileDescriptors[v.GetName()] = v
-	}
-
-	// 2. 获取消息描述符
-	configMsgName := fmt.Sprintf("%v.%v", s.getPackageName(), s.sheetName)
-	configDesc := fileDescriptors[0].FindMessage(configMsgName + "Config")
-	recordDesc := fileDescriptors[0].FindMessage(configMsgName)
-
-	// 5. 构造多个 record 数据
-	var records []*dynamic.Message
-	for _, row := range s.data {
-		record := dynamic.NewMessage(recordDesc)
-
-		for colIdx, value := range row {
-			fd := s.GetFiled(int32(colIdx))
-			if fd.IsCustomMessage(root) {
-				// message字段
-				fieldDesc := record.GetMessageDescriptor().FindFieldByName(fd.Name())
-				fileDesc := indexesFileDescriptors[fd.BaseType()+".proto"]
-				customs := s.procCustomProtoType(root, fileDesc, fieldDesc, fd, value)
-				if fd.IsRepeated() {
-					record.SetFieldByName(fd.Name(), customs)
-				} else if customs != nil {
-					record.SetFieldByName(fd.Name(), customs[0])
-				}
-			} else {
-				// 基础类型和enum字段
-				fieldDesc := record.GetMessageDescriptor().FindFieldByName(fd.Name())
-				arrValue := s.procBaseProtoType(root, fieldDesc, fd, value)
-				if fd.IsRepeated() {
-					record.SetFieldByName(fd.Name(), arrValue)
-				} else if arrValue != nil {
-					record.SetFieldByName(fd.Name(), arrValue[0])
-				}
-			}
-		}
-
-		records = append(records, record)
-	}
-
-	// 3. 创建动态消息并填充数据
-	configMsg := dynamic.NewMessage(configDesc)
-	configMsg.SetFieldByName("Records", records)
-
-	// 4. 序列化
-	data, err := configMsg.Marshal()
-	if err != nil {
-		panic(err)
-	}
-
-	// make dirs
-	outPath := s.getDataOutPath()
-	os.MkdirAll(outPath, os.ModePerm)
-
-	// write data file
-	dataFilePath := s.getDataFilePath()
-	os.WriteFile(dataFilePath, data, os.ModePerm)
-}
-
-func (s *SheetParser) procBaseProtoType(root *Parser, fdDesc *desc.FieldDescriptor, fd Head, value string) []interface{} {
-	var arrValue []interface{}
-	for _, v := range SplitBaseValue(value) {
-		arrValue = append(arrValue, TypeNameToValue(root, fdDesc, s.sheetName, fd.Name(), fd.BaseType(), v))
-	}
-	return arrValue
-}
-
-func (s *SheetParser) procCustomProtoType(root *Parser, fileDesc *desc.FileDescriptor, fdDesc *desc.FieldDescriptor, fd Head, value string) []*dynamic.Message {
-	var customs []*dynamic.Message
-
-	customParser := root.getSheetParser(fd.BaseType())
-	msgName := fmt.Sprintf("%v.%v", s.getPackageName(), fd.BaseType())
-	customDesc := fileDesc.FindMessage(msgName)
-	// 构造多个子结构
-	customRows := SplitCustomValue(value)
-	for _, customRow := range customRows {
-		customMsg := dynamic.NewMessage(customDesc)
-		for idx, subValue := range customRow {
-			subFd := customParser.GetFiled(int32(idx))
-			customMsg.SetFieldByName(subFd.Name(), TypeNameToValue(root, fdDesc, s.sheetName, subFd.Name(), subFd.BaseType(), subValue))
-		}
-		customs = append(customs, customMsg)
-	}
-
-	return customs
-}
-
-func (s *SheetParser) procBaseProtoTypeV2(root *Parser, fd Head, value string) []protoreflect.Value {
+func (s *SheetParser) procBaseProtoType(root *Parser, fd Head, value string) []protoreflect.Value {
 	var arrValue []protoreflect.Value
 	for _, v := range SplitBaseValue(value) {
-		arrValue = append(arrValue, TypeNameToValueV2(root, s.sheetName, fd.Name(), fd.BaseType(), v))
+		arrValue = append(arrValue, TypeNameToValue(root, s.sheetName, fd.Name(), fd.BaseType(), v))
 	}
 	return arrValue
 }
 
-func (s *SheetParser) procCustomProtoTypeV2(root *Parser, msgType protoreflect.MessageType, fd Head, value string) []protoreflect.Value {
+func (s *SheetParser) procCustomProtoType(root *Parser, msgType protoreflect.MessageType, fd Head, value string) []protoreflect.Value {
 	var customs []protoreflect.Value
 
 	customParser := root.getSheetParser(fd.BaseType())
@@ -691,7 +579,7 @@ func (s *SheetParser) procCustomProtoTypeV2(root *Parser, msgType protoreflect.M
 		for idx, subValue := range customRow {
 			subFd := customParser.GetFiled(int32(idx))
 			pbField := customMsg.Descriptor().Fields().ByName(protoreflect.Name(subFd.Name()))
-			customMsg.Set(pbField, TypeNameToValueV2(root, s.sheetName, subFd.Name(), subFd.BaseType(), subValue))
+			customMsg.Set(pbField, TypeNameToValue(root, s.sheetName, subFd.Name(), subFd.BaseType(), subValue))
 		}
 		customs = append(customs, protoreflect.ValueOfMessage(customMsg))
 	}

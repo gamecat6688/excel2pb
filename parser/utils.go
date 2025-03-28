@@ -2,7 +2,6 @@ package parser
 
 import (
 	"fmt"
-	"github.com/jhump/protoreflect/desc"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"strconv"
 	"strings"
@@ -105,37 +104,7 @@ func DataRow2ExcelRow(row int32) int32 {
 	return row + HeadCount
 }
 
-func TypeNameToValue(root *Parser, fdDesc *desc.FieldDescriptor, sheetName string, headName string, typeName string, value string) interface{} {
-	switch typeName {
-	case "string", I18nName:
-		v := value
-		return v
-	case "int32":
-		v, _ := strconv.ParseInt(value, 10, 23)
-		return int32(v)
-	case "int64":
-		v, _ := strconv.ParseInt(value, 10, 64)
-		return v
-	case "float", "double":
-		v, _ := strconv.ParseFloat(value, 10)
-		return v
-	case "bool":
-		v, _ := strconv.ParseBool(value)
-		return v
-	default:
-		if root.hasEnumParser(typeName) {
-			v, _ := strconv.ParseInt(value, 10, 64)
-			enumDesc := fdDesc.GetEnumType().FindValueByNumber(int32(v))
-			return enumDesc
-		} else {
-			panic(fmt.Sprintf("[%v.%v]not support type %v", sheetName, headName, typeName))
-			return nil
-		}
-	}
-	return 0
-}
-
-func TypeNameToValueV2(root *Parser, sheetName string, headName string, typeName string, value string) protoreflect.Value {
+func TypeNameToValue(root *Parser, sheetName string, headName string, typeName string, value string) protoreflect.Value {
 	switch typeName {
 	case "string", I18nName:
 		return protoreflect.ValueOfString(value)
