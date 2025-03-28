@@ -8,7 +8,8 @@ package {{.PackageName}};
 option csharp_namespace = "{{.PackageName}}";
 option go_package = "/{{.PackageName}}";
 
-{{range .Imports}}import {{.ProtoPath}}{{end}}
+{{range .Imports}}import {{.ProtoPath}}
+{{end}}
 
 message {{.MessageName}}Config {
   repeated {{.MessageName}} Records = 1;
@@ -30,8 +31,7 @@ option csharp_namespace = "{{.PackageName}}";
 option go_package = "/{{.PackageName}}";
 
 
-enum {{.MessageName}}
-{
+enum {{.MessageName}} {
 {{range .Fields}}  {{.FieldName}} = {{.FieldTag}}; // {{.Comment}}
 {{end}}
 }
