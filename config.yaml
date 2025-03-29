@@ -7,7 +7,7 @@ Outs:
     ProtoPath: assets/out_proto/client/
     PbPath:    assets/out_pb/client/
     DataPath:  assets/out_data/client/
-    DataExt:  ".data"
+    DataExt:  ".bytes"
     PackageName:  "pb"
     CodeLanguage:  "csharp"
   Server:

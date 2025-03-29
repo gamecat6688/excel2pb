@@ -99,7 +99,7 @@ DataOutPaths:
   s: assets/out_data/server/
 
 DataExtensions:
-  c: ".data"
+  c: ".bytes"
   s: ".data"
 
 ProtoPackages:
