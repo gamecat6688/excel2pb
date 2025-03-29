@@ -33,7 +33,8 @@ type Sheet struct {
 	headersIndexes map[string]int32 // key is name, value is index
 
 	// 数据
-	data [][]string
+	headRows [][]string
+	dataRows [][]string
 }
 
 func (s *Sheet) IsClient() bool {
@@ -45,7 +46,7 @@ func (s *Sheet) IsServer() bool {
 }
 
 func (s *Sheet) HasData() bool {
-	return len(s.data) > 0
+	return len(s.dataRows) > 0
 }
 
 // //////////////////////
@@ -93,40 +94,12 @@ func (s *SheetParser) GetI18nPrimaryKey(rowIdx int32) string {
 	return strings.TrimLeft(pkValue, "_")
 }
 
-func (s *SheetParser) Parse(f *excelize.File) bool {
-	rows, _ := f.GetRows(s.sheetName)
+func (s *SheetParser) ParseRows(rows [][]string) {
 	s.parseHeader(rows)
-	s.parseHeadTags(f)
 	s.parseData(rows)
-
-	return true
 }
 
-func (s *SheetParser) isHeader(rowIndex int32) bool {
-	return rowIndex < HeadCount
-}
-
-func (s *SheetParser) parseHeader(rows [][]string) {
-	// 预先分配字段数量
-	s.headers = make([]Head, len(rows[0]))
-
-	for i, row := range rows {
-		if !s.isHeader(int32(i)) {
-			break
-		}
-
-		for j, cell := range row {
-			s.headers[j].info[i] = cell
-		}
-	}
-
-	// build indexes
-	for colIndex, head := range s.headers {
-		s.headersIndexes[head.Name()] = int32(colIndex)
-	}
-}
-
-func (s *SheetParser) parseHeadTags(f *excelize.File) {
+func (s *SheetParser) ParseHeadTags(f *excelize.File) {
 	comments, _ := f.GetComments(s.sheetName)
 	for _, v := range comments {
 		col, row, _ := excelize.CellNameToCoordinates(v.Cell)
@@ -153,6 +126,44 @@ func (s *SheetParser) parseHeadTags(f *excelize.File) {
 	}
 }
 
+func (s *SheetParser) isHeader(rowIndex int32) bool {
+	return rowIndex < HeadCount
+}
+
+func (s *SheetParser) clearHeaders() {
+	s.headers = nil
+	s.headersIndexes = map[string]int32{}
+	s.headRows = nil
+}
+
+func (s *SheetParser) parseHeader(rows [][]string) {
+	s.clearHeaders()
+
+	if len(rows[0]) == 0 {
+		panic(fmt.Sprintf("sheet %v, header is empty", s.sheetName))
+	}
+
+	// 预先分配字段数量
+	s.headers = make([]Head, len(rows[0]))
+
+	for i, row := range rows {
+		if !s.isHeader(int32(i)) {
+			break
+		}
+
+		for j, cell := range row {
+			s.headers[j].info[i] = cell
+		}
+
+		s.headRows = append(s.headRows, row)
+	}
+
+	// build indexes
+	for colIndex, head := range s.headers {
+		s.headersIndexes[head.Name()] = int32(colIndex)
+	}
+}
+
 func (s *SheetParser) parseData(rows [][]string) {
 	for i, row := range rows {
 		// 跳过表头
@@ -165,7 +176,7 @@ func (s *SheetParser) parseData(rows [][]string) {
 			continue
 		}
 
-		s.data = append(s.data, row)
+		s.dataRows = append(s.dataRows, row)
 	}
 }
 
@@ -174,7 +185,7 @@ func (s *SheetParser) checkFiledValueIsUnique(filedName string) (value string, o
 	// 检查指定列的数据，是否存在重复值
 	colIndex := s.getFieldColIndex(filedName)
 	values := make(map[string]bool)
-	for _, row := range s.data {
+	for _, row := range s.dataRows {
 		v := row[colIndex]
 		if values[v] {
 			return v, false
@@ -190,7 +201,7 @@ func (s *SheetParser) checkFiledValueIsUnique(filedName string) (value string, o
 func (s *SheetParser) hasExistFiledValue(filedName string, filedValue string) bool {
 	// 检查指定列的数据，是否存在
 	colIndex := s.getFieldColIndex(filedName)
-	for _, row := range s.data {
+	for _, row := range s.dataRows {
 		value := row[colIndex]
 		if value == filedValue {
 			return true
@@ -201,10 +212,10 @@ func (s *SheetParser) hasExistFiledValue(filedName string, filedValue string) bo
 
 func (s *SheetParser) getFiledValue(filedName string, rowIndex int32) string {
 	colIndex := s.getFieldColIndex(filedName)
-	if int(colIndex) >= len(s.data[rowIndex]) {
+	if int(colIndex) >= len(s.dataRows[rowIndex]) {
 		return ""
 	}
-	return s.data[rowIndex][colIndex]
+	return s.dataRows[rowIndex][colIndex]
 }
 
 func (s *SheetParser) checks(root *Parser) {
@@ -261,7 +272,7 @@ func (s *SheetParser) checkTags(root *Parser) {
 
 					// 检测外键的字段值是否存在（支持repeated）
 					refSheetParser := root.getSheetParser(fkSheetName)
-					for rowIndex, _ := range s.data {
+					for rowIndex, _ := range s.dataRows {
 						thisValue := s.getFiledValue(head.Name(), int32(rowIndex))
 						values := SplitBaseValue(thisValue)
 						for _, checkValue := range values {
@@ -283,7 +294,7 @@ func (s *SheetParser) checkTags(root *Parser) {
 
 					// 检测外键的字段值是否存在（支持repeated）
 					refSheetParser := root.getSheetParser(fkSheetName)
-					for rowIndex, _ := range s.data {
+					for rowIndex, _ := range s.dataRows {
 						thisValue := s.getFiledValue(head.Name(), int32(rowIndex))
 						values := SplitCustomValue(thisValue)
 						for _, checkMsg := range values {
@@ -324,7 +335,7 @@ func (s *SheetParser) SplitByFilter(filterName string) *SheetParser {
 	}
 
 	// 复制过滤后的数据
-	for _, row := range s.data {
+	for _, row := range s.dataRows {
 		var newRow []string
 		for _, head := range ns.headers {
 			colIndex := s.getFieldColIndex(head.Name())
@@ -333,7 +344,7 @@ func (s *SheetParser) SplitByFilter(filterName string) *SheetParser {
 			}
 			newRow = append(newRow, row[colIndex])
 		}
-		ns.data = append(ns.data, newRow)
+		ns.dataRows = append(ns.dataRows, newRow)
 	}
 
 	// 重建表头索引
@@ -412,7 +423,7 @@ func (s *SheetParser) ExportProto(root *Parser) {
 	// 解析模板
 	tmpl, err := template.New("proto").Parse(ProtoMessageTemplate)
 	if err != nil {
-		slog.Error("parse proto message template fail", "error", err)
+		slog.Error("parseFromFile proto message template fail", "error", err)
 		return
 	}
 
@@ -509,7 +520,7 @@ func (s *SheetParser) ExportData(root *Parser) {
 
 	// 5. 构造多个 record 数据
 	var records []protoreflect.Message
-	for rowIdx, row := range s.data {
+	for rowIdx, row := range s.dataRows {
 		record := recordMsgType.New()
 
 		for colIdx, value := range row {
@@ -567,7 +578,7 @@ func (s *SheetParser) ExportData(root *Parser) {
 	outPath := s.getDataOutPath()
 	os.MkdirAll(outPath, os.ModePerm)
 
-	// write data file
+	// write dataRows file
 	dataFilePath := s.getDataFilePath()
 	os.WriteFile(dataFilePath, data, os.ModePerm)
 }
@@ -622,7 +633,7 @@ func (s *SheetParser) TypeNameToValue(root *Parser, fd Head, rowIdx int32, value
 		timeOfZone := DataTimeToRFC3339(value, config.Cfg.TimeZone)
 		t, err := time.Parse(time.RFC3339, timeOfZone)
 		if err != nil {
-			panic(fmt.Sprintf("[%v.%v]parse time fail, val:%v, time:%v", sheetName, headName, value, timeOfZone))
+			panic(fmt.Sprintf("[%v.%v]parseFromFile time fail, val:%v, time:%v", sheetName, headName, value, timeOfZone))
 		}
 		return protoreflect.ValueOfInt64(t.Unix())
 	case I18nName:

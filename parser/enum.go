@@ -78,7 +78,7 @@ func (s *EnumParser) ExportProto(filter string) {
 	// 解析模板
 	tmpl, err := template.New("proto").Parse(ProtoEnumTemplate)
 	if err != nil {
-		slog.Error("parse proto enum template fail", "error", err)
+		slog.Error("parseFromFile proto enum template fail", "error", err)
 		return
 	}
 

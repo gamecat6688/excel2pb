@@ -28,6 +28,8 @@ type OutConfig struct {
 type Config struct {
 	TimeZone string `yaml:"TimeZone"`
 
+	EnableI18n bool `yaml:"EnableI18n"`
+
 	ExcelDir string `yaml:"ExcelDir"`
 
 	ProtoImportPath string `yaml:"ProtoImportPath"`
@@ -73,6 +75,7 @@ func loadConfigFromData(data []byte) (*Config, error) {
 
 var defaultConfigData = `
 TimeZone: "+08:00"
+EnableI18n: true
 ExcelDir: assets/xls/
 ProtoImportPath: ""
 
