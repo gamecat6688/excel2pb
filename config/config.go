@@ -75,7 +75,7 @@ Outs:
     ProtoPath: assets/out_proto/client/
     PbPath:    assets/out_pb/client/
     DataPath:  assets/out_data/client/
-    DataExt:  ".data"
+    DataExt:  ".bytes"
     PackageName:  "pb"
     CodeLanguage:  "csharp"
   Server:
@@ -85,30 +85,6 @@ Outs:
     DataExt: ".data"
     PackageName: "pbs"
     CodeLanguage: "golang"
-
-ProtoOutPaths:
-  c: assets/out_proto/client/
-  s: assets/out_proto/server/
-
-PbOutPaths:
-  c: assets/out_pb/client/
-  s: assets/out_pb/server/
-
-DataOutPaths:
-  c: assets/out_data/client/
-  s: assets/out_data/server/
-
-DataExtensions:
-  c: ".bytes"
-  s: ".data"
-
-ProtoPackages:
-  c: "pb"
-  s: "pbs"
-
-GenerateLanguage:
-  c: "csharp"
-  s: "golang"
 
 TplCodePaths:
   golang: assets/out_code/golang/
