@@ -3,6 +3,8 @@ package parser
 import (
 	"github.com/xuri/excelize/v2"
 	"log/slog"
+	"sort"
+	"strings"
 )
 
 const (
@@ -88,7 +90,35 @@ func (i *I18nParser) SetData(id string, cn string) {
 	}
 }
 
+func (i *I18nParser) sortDataRows() {
+	// 排序
+	sort.SliceStable(i.dataRows, func(m, n int) bool {
+		ss1 := strings.Split(i.dataRows[m][0], "_")
+		par1 := ss1[0] + ss1[1]
+		id1 := ss1[2]
+
+		ss2 := strings.Split(i.dataRows[n][0], "_")
+		par2 := ss2[0] + ss2[1]
+		id2 := ss2[2]
+
+		// 先比较首字母
+		if par1 != par1 {
+			return par1 < par2
+		}
+
+		if IsNumber(id1) {
+			// 数字比较
+			return ToInt64(id1) < ToInt64(id2)
+		}
+
+		// 字符比较
+		return id1 < id2
+	})
+}
+
 func (i *I18nParser) WriteToExcel(excelFile string) bool {
+	i.sortDataRows()
+
 	f := excelize.NewFile()
 	defer func() {
 		if err := f.Close(); err != nil {
