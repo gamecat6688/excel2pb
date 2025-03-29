@@ -15,7 +15,7 @@ func main() {
 	p.ParseExcels()
 	p.Export()
 
-	// testReadData()
+	//testReadData()
 
 	//if RewriteI18nExcel {
 	//	// 回写多语言表格
@@ -30,22 +30,21 @@ func main() {
 }
 
 func testReadData() {
-	// 测试生成后的反序列化
-	data, err := os.ReadFile("assets/out_data/server/Upgrade.data")
-	if err != nil {
-		panic(err)
-	}
-	cfg := &pbs.UpgradeConfig{}
-	proto.Unmarshal(data, cfg)
-	fmt.Printf("cfg: %v\n", cfg)
-
-	itemData, err := os.ReadFile("assets/out_data/server/Item.data")
+	dataItem, err := os.ReadFile("assets/out_data/server/Item.data")
 	if err != nil {
 		panic(err)
 	}
 	cfgItem := &pbs.ItemConfig{}
-	proto.Unmarshal(itemData, cfgItem)
+	proto.Unmarshal(dataItem, cfgItem)
 	fmt.Printf("cfgItem: %v\n", cfgItem)
+
+	dataUpgrade, err := os.ReadFile("assets/out_data/server/Upgrade.data")
+	if err != nil {
+		panic(err)
+	}
+	cfgUpgrade := &pbs.UpgradeConfig{}
+	proto.Unmarshal(dataUpgrade, cfgUpgrade)
+	fmt.Printf("Upgrade: %v\n", cfgUpgrade)
 
 	dataShop, err := os.ReadFile("assets/out_data/server/Shop.data")
 	if err != nil {
@@ -53,5 +52,5 @@ func testReadData() {
 	}
 	cfgShop := &pbs.ShopConfig{}
 	proto.Unmarshal(dataShop, cfgShop)
-	fmt.Printf("cfg: %v\n", cfgShop)
+	fmt.Printf("cfgShop: %v\n", cfgShop)
 }
