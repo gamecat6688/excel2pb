@@ -17,6 +17,16 @@ func TimeCost(tag string) func() {
 	}
 }
 
+func IsNumber(str string) bool {
+	v, err := strconv.Atoi(str)
+	_ = v
+	if err != nil {
+		return false
+	}
+
+	return true
+}
+
 func ToString(val interface{}) string {
 	return fmt.Sprintf("%v", val)
 }
