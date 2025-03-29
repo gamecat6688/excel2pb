@@ -40,6 +40,15 @@ func ToInt64(val string) int64 {
 	return rv
 }
 
+func ToFloat32(val string) float32 {
+	rv, err := strconv.ParseFloat(val, 10)
+	if err != nil {
+		return 0
+	}
+
+	return float32(rv)
+}
+
 func ToFloat64(val string) float64 {
 	rv, err := strconv.ParseFloat(val, 10)
 	if err != nil {
@@ -116,13 +125,15 @@ func DataTimeToRFC3339(datetime string, zone string) string {
 
 func TypeNameToValue(root *Parser, sheetName string, headName string, typeName string, value string) protoreflect.Value {
 	switch typeName {
-	case "string", I18nName:
+	case "string":
 		return protoreflect.ValueOfString(value)
 	case "int32":
 		return protoreflect.ValueOfInt32(ToInt32(value))
 	case "int64":
 		return protoreflect.ValueOfInt64(ToInt64(value))
-	case "float", "double":
+	case "float":
+		return protoreflect.ValueOfFloat32(ToFloat32(value))
+	case "double":
 		return protoreflect.ValueOfFloat64(ToFloat64(value))
 	case "bool":
 		return protoreflect.ValueOfBool(ToBool(value))
@@ -133,6 +144,9 @@ func TypeNameToValue(root *Parser, sheetName string, headName string, typeName s
 			panic(fmt.Sprintf("[%v.%v]parse time fail, val:%v, time:%v", sheetName, headName, value, timeOfZone))
 		}
 		return protoreflect.ValueOfInt64(t.Unix())
+	case I18nName:
+		// 读取多语言表，并写入Key
+		return protoreflect.ValueOfString(value)
 	default:
 		if root.hasEnumParser(typeName) {
 			return protoreflect.ValueOfEnum(protoreflect.EnumNumber(ToInt32(value)))
