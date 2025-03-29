@@ -15,7 +15,7 @@ func main() {
 	p.ParseExcels()
 	p.Export()
 
-	//testReadData()
+	testReadData()
 
 	//if RewriteI18nExcel {
 	//	// 回写多语言表格

@@ -1,12 +1,9 @@
 package parser
 
 import (
-	"excel2pb/config"
 	"fmt"
-	"google.golang.org/protobuf/reflect/protoreflect"
 	"strconv"
 	"strings"
-	"time"
 )
 
 func ToString(val interface{}) string {
@@ -123,39 +120,9 @@ func DataTimeToRFC3339(datetime string, zone string) string {
 	return timeOfZone
 }
 
-func TypeNameToValue(root *Parser, sheetName string, headName string, typeName string, value string) protoreflect.Value {
-	switch typeName {
-	case "string":
-		return protoreflect.ValueOfString(value)
-	case "int32":
-		return protoreflect.ValueOfInt32(ToInt32(value))
-	case "int64":
-		return protoreflect.ValueOfInt64(ToInt64(value))
-	case "float":
-		return protoreflect.ValueOfFloat32(ToFloat32(value))
-	case "double":
-		return protoreflect.ValueOfFloat64(ToFloat64(value))
-	case "bool":
-		return protoreflect.ValueOfBool(ToBool(value))
-	case TimestampName:
-		timeOfZone := DataTimeToRFC3339(value, config.Cfg.TimeZone)
-		t, err := time.Parse(time.RFC3339, timeOfZone)
-		if err != nil {
-			panic(fmt.Sprintf("[%v.%v]parse time fail, val:%v, time:%v", sheetName, headName, value, timeOfZone))
-		}
-		return protoreflect.ValueOfInt64(t.Unix())
-	case I18nName:
-		// 读取多语言表，并写入Key
-		return protoreflect.ValueOfString(value)
-	default:
-		if root.hasEnumParser(typeName) {
-			return protoreflect.ValueOfEnum(protoreflect.EnumNumber(ToInt32(value)))
-		} else {
-			panic(fmt.Sprintf("[%v.%v]not support type %v", sheetName, headName, typeName))
-		}
-	}
-
-	return protoreflect.ValueOf(nil)
+// MakeI18nKey key = 表名_字段名_主键值
+func MakeI18nKey(sheetName string, headName string, keyValue interface{}) string {
+	return fmt.Sprintf("%v_%v_%v", sheetName, headName, ToString(keyValue))
 }
 
 //func ProtoType(goType string) (*descriptorpb.FieldDescriptorProto_Type, error) {
