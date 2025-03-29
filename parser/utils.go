@@ -1,10 +1,12 @@
 package parser
 
 import (
+	"excel2pb/config"
 	"fmt"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func ToString(val interface{}) string {
@@ -104,6 +106,14 @@ func DataRow2ExcelRow(row int32) int32 {
 	return row + HeadCount
 }
 
+// 例子：2025-03-01 08:00:05 转为 2025-03-01T08:00:05+08:00
+// zone 时区 +08:00
+func DataTimeToRFC3339(datetime string, zone string) string {
+	ss := strings.Split(datetime, " ")
+	timeOfZone := ss[0] + "T" + ss[1] + zone
+	return timeOfZone
+}
+
 func TypeNameToValue(root *Parser, sheetName string, headName string, typeName string, value string) protoreflect.Value {
 	switch typeName {
 	case "string", I18nName:
@@ -116,6 +126,13 @@ func TypeNameToValue(root *Parser, sheetName string, headName string, typeName s
 		return protoreflect.ValueOfFloat64(ToFloat64(value))
 	case "bool":
 		return protoreflect.ValueOfBool(ToBool(value))
+	case TimestampName:
+		timeOfZone := DataTimeToRFC3339(value, config.Cfg.TimeZone)
+		t, err := time.Parse(time.RFC3339, timeOfZone)
+		if err != nil {
+			panic(fmt.Sprintf("[%v.%v]parse time fail, val:%v, time:%v", sheetName, headName, value, timeOfZone))
+		}
+		return protoreflect.ValueOfInt64(t.Unix())
 	default:
 		if root.hasEnumParser(typeName) {
 			return protoreflect.ValueOfEnum(protoreflect.EnumNumber(ToInt32(value)))

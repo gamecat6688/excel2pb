@@ -23,12 +23,12 @@ excel导出protobuf二进制，并导出读取代码
 
  2. 字段类型
     目前支持的类型有：
-    1. 基础类型：int, float, string, bool, enum, struct
-    2. 数组类型：int[], float[], string[], bool[], enum[], struct[]
+    1. 基础类型：int, float, string, bool, timestamp, enum, struct
+    2. 数组类型：repeated <typename>
 ```
 
 # TODO List
 - [ ] 支持多个主键
 - [ ] 支持生成读取代码
 - [ ] 支持多语言导出
-- [ ] 支持时间戳转换
+- [x] 支持时间戳转换

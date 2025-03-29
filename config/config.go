@@ -26,11 +26,17 @@ type OutConfig struct {
 }
 
 type Config struct {
-	ExcelDir        string               `yaml:"ExcelDir"`
-	ProtoImportPath string               `yaml:"ProtoImportPath"`
-	Outs            map[string]OutConfig `yaml:"Outs"`
-	CodeOutPaths    map[string]string    `yaml:"CodeOutPaths"`
-	TplCodePaths    map[string]string    `yaml:"TplCodePaths"`
+	TimeZone string `yaml:"TimeZone"`
+
+	ExcelDir string `yaml:"ExcelDir"`
+
+	ProtoImportPath string `yaml:"ProtoImportPath"`
+
+	Outs map[string]OutConfig `yaml:"Outs"`
+
+	CodeOutPaths map[string]string `yaml:"CodeOutPaths"`
+
+	TplCodePaths map[string]string `yaml:"TplCodePaths"`
 }
 
 var Cfg *Config
@@ -66,8 +72,8 @@ func loadConfigFromData(data []byte) (*Config, error) {
 }
 
 var defaultConfigData = `
+TimeZone: "+08:00"
 ExcelDir: assets/xls/
-
 ProtoImportPath: ""
 
 Outs:
