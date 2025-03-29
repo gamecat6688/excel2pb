@@ -4,7 +4,18 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 )
+
+// TimeCost 耗时统计函数
+// 使用方法：defer TimeCost("funcName")()
+func TimeCost(tag string) func() {
+	start := time.Now()
+	return func() {
+		tc := time.Since(start)
+		fmt.Printf("%v - [%v] time cost = %v\n", time.Now(), tag, tc)
+	}
+}
 
 func ToString(val interface{}) string {
 	return fmt.Sprintf("%v", val)
@@ -124,22 +135,3 @@ func DataTimeToRFC3339(datetime string, zone string) string {
 func MakeI18nKey(sheetName string, headName string, keyValue interface{}) string {
 	return fmt.Sprintf("%v_%v_%v", sheetName, headName, ToString(keyValue))
 }
-
-//func ProtoType(goType string) (*descriptorpb.FieldDescriptorProto_Type, error) {
-//	switch goType {
-//	case "string":
-//		return descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum(), nil
-//	case "int32":
-//		return descriptorpb.FieldDescriptorProto_TYPE_INT32.Enum(), nil
-//	case "int64":
-//		return descriptorpb.FieldDescriptorProto_TYPE_INT64.Enum(), nil
-//	case "float":
-//		return descriptorpb.FieldDescriptorProto_TYPE_FLOAT.Enum(), nil
-//	case "double":
-//		return descriptorpb.FieldDescriptorProto_TYPE_DOUBLE.Enum(), nil
-//	case "bool":
-//		return descriptorpb.FieldDescriptorProto_TYPE_BOOL.Enum(), nil
-//	default:
-//		return nil, fmt.Errorf("不支持的类型: %s", goType)
-//	}
-//}

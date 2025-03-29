@@ -35,9 +35,15 @@ func (p *Parser) ParseExcels() {
 	// 遍历并过滤掉临时文件
 	var excels []string
 	for _, f := range sss {
-		if !strings.HasPrefix(filepath.Base(f), "~") {
-			excels = append(excels, f)
+		if strings.HasPrefix(filepath.Base(f), "~") {
+			continue
 		}
+
+		//if strings.HasPrefix(filepath.Base(f), I18nSheetName) {
+		//	continue
+		//}
+
+		excels = append(excels, f)
 	}
 
 	// 并发解析excel
@@ -46,14 +52,14 @@ func (p *Parser) ParseExcels() {
 	for _, f := range excels {
 		wg.Add(1)
 		go func(fileName string) {
-			p.parse(fileName)
+			p.parseFromFile(fileName)
 			wg.Done()
 		}(f)
 	}
 	wg.Wait()
 }
 
-func (p *Parser) parse(excelFile string) {
+func (p *Parser) parseFromFile(excelFile string) {
 	f, err := excelize.OpenFile(excelFile)
 	if err != nil {
 		slog.Error("open file fail", "error", err)
@@ -77,7 +83,7 @@ func (p *Parser) parse(excelFile string) {
 			enumName := SplitEnumName(sheetName)
 			ps := NewEnumParser(sheetName)
 			if !ps.Parse(f) {
-				slog.Error("parse sheet fail", "sheetName", sheetName)
+				slog.Error("parseFromFile sheet fail", "sheetName", sheetName)
 				return
 			}
 
@@ -90,21 +96,57 @@ func (p *Parser) parse(excelFile string) {
 			}
 
 			ps := NewSheetParser(sheetName)
-			if !ps.Parse(f) {
-				slog.Error("parse sheet fail", "sheetName", sheetName)
-				return
-			}
+			rows, _ := f.GetRows(sheetName)
+			ps.ParseRows(rows)
+			ps.ParseHeadTags(f)
 
 			p.sheets[sheetName] = ps
 		}
 	}
 }
 
+func (p *Parser) GetI18nFilePath() string {
+	return fmt.Sprintf("%v/%v.xlsx", config.Cfg.ExcelDir, I18nSheetName)
+}
+
+func (p *Parser) MergeI18n() {
+	if !config.Cfg.EnableI18n {
+		return
+	}
+
+	//defer TimeCost("MergeI18n")()
+
+	var i18n *I18nParser
+	f, err := excelize.OpenFile(p.GetI18nFilePath())
+	if err == nil {
+		defer f.Close()
+
+		// 读取已存在的i18n文件
+		ps := NewSheetParser(I18nSheetName)
+		rows, _ := f.GetRows(I18nSheetName)
+		ps.ParseRows(rows)
+
+		i18n = NewI18nParser(ps)
+	} else {
+		// 创建新的i18n文件
+		i18n = NewI18nParser(nil)
+	}
+
+	// 合并新的多语言数据
+	for _, v := range p.sheets {
+		i18n.MergeSheet(v)
+	}
+
+	i18n.WriteToExcel(p.GetI18nFilePath())
+
+	p.sheets[I18nSheetName] = i18n.SheetParser
+}
+
 func (p *Parser) Export() {
 	p.checks()
 	p.exportProto()
-	p.exportPb()
 	p.exportData()
+	p.exportPb()
 	p.exportCode()
 }
 
