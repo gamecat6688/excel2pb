@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"strings"
 	"text/template"
+	"time"
 )
 
 var reTrimTag = regexp.MustCompile(`[\n\t\r ]+`)
@@ -72,6 +73,24 @@ func (s *SheetParser) getFieldColIndex(name string) int32 {
 // GetFiled 获得指定字段名的列索引
 func (s *SheetParser) GetFiled(colIndex int32) Head {
 	return s.headers[colIndex]
+}
+
+func (s *SheetParser) GetPrimaryKeys() (rv []Head) {
+	for _, v := range s.headers {
+		if v.IsPrimaryKey() {
+			rv = append(rv, v)
+		}
+	}
+	return
+}
+
+func (s *SheetParser) GetI18nPrimaryKey(rowIdx int32) string {
+	var pkValue string
+	pks := s.GetPrimaryKeys()
+	for _, v := range pks {
+		pkValue += "_" + s.getFiledValue(v.Name(), rowIdx)
+	}
+	return strings.TrimLeft(pkValue, "_")
 }
 
 func (s *SheetParser) Parse(f *excelize.File) bool {
@@ -490,7 +509,7 @@ func (s *SheetParser) ExportData(root *Parser) {
 
 	// 5. 构造多个 record 数据
 	var records []protoreflect.Message
-	for _, row := range s.data {
+	for rowIdx, row := range s.data {
 		record := recordMsgType.New()
 
 		for colIdx, value := range row {
@@ -504,7 +523,7 @@ func (s *SheetParser) ExportData(root *Parser) {
 					log.Fatal(err2)
 				}
 
-				customs := s.procCustomProtoType(root, subMsgType, fd, value)
+				customs := s.procCustomProtoType(root, subMsgType, fd, int32(rowIdx), value)
 				if fd.IsRepeated() {
 					fdList := record.Mutable(pbField).List()
 					for _, val := range customs {
@@ -515,7 +534,7 @@ func (s *SheetParser) ExportData(root *Parser) {
 				}
 			} else {
 				// 基础类型和enum字段
-				arrValues := s.procBaseProtoType(root, fd, value)
+				arrValues := s.procBaseProtoType(root, fd, int32(rowIdx), value)
 				if fd.IsRepeated() {
 					fdList := record.Mutable(pbField).List()
 					for _, val := range arrValues {
@@ -553,15 +572,15 @@ func (s *SheetParser) ExportData(root *Parser) {
 	os.WriteFile(dataFilePath, data, os.ModePerm)
 }
 
-func (s *SheetParser) procBaseProtoType(root *Parser, fd Head, value string) []protoreflect.Value {
+func (s *SheetParser) procBaseProtoType(root *Parser, fd Head, rowIdx int32, value string) []protoreflect.Value {
 	var arrValue []protoreflect.Value
 	for _, v := range SplitBaseValue(value) {
-		arrValue = append(arrValue, TypeNameToValue(root, s.sheetName, fd.Name(), fd.BaseType(), v))
+		arrValue = append(arrValue, s.TypeNameToValue(root, fd, rowIdx, v))
 	}
 	return arrValue
 }
 
-func (s *SheetParser) procCustomProtoType(root *Parser, msgType protoreflect.MessageType, fd Head, value string) []protoreflect.Value {
+func (s *SheetParser) procCustomProtoType(root *Parser, msgType protoreflect.MessageType, fd Head, rowIdx int32, value string) []protoreflect.Value {
 	var customs []protoreflect.Value
 
 	customParser := root.getSheetParser(fd.BaseType())
@@ -573,10 +592,50 @@ func (s *SheetParser) procCustomProtoType(root *Parser, msgType protoreflect.Mes
 		for idx, subValue := range customRow {
 			subFd := customParser.GetFiled(int32(idx))
 			pbField := customMsg.Descriptor().Fields().ByName(protoreflect.Name(subFd.Name()))
-			customMsg.Set(pbField, TypeNameToValue(root, s.sheetName, subFd.Name(), subFd.BaseType(), subValue))
+			customMsg.Set(pbField, s.TypeNameToValue(root, subFd, rowIdx, subValue))
 		}
 		customs = append(customs, protoreflect.ValueOfMessage(customMsg))
 	}
 
 	return customs
+}
+
+func (s *SheetParser) TypeNameToValue(root *Parser, fd Head, rowIdx int32, value string) protoreflect.Value {
+	sheetName := s.sheetName
+	headName := fd.Name()
+	typeName := fd.BaseType()
+
+	switch typeName {
+	case "string":
+		return protoreflect.ValueOfString(value)
+	case "int32":
+		return protoreflect.ValueOfInt32(ToInt32(value))
+	case "int64":
+		return protoreflect.ValueOfInt64(ToInt64(value))
+	case "float":
+		return protoreflect.ValueOfFloat32(ToFloat32(value))
+	case "double":
+		return protoreflect.ValueOfFloat64(ToFloat64(value))
+	case "bool":
+		return protoreflect.ValueOfBool(ToBool(value))
+	case TimestampName:
+		timeOfZone := DataTimeToRFC3339(value, config.Cfg.TimeZone)
+		t, err := time.Parse(time.RFC3339, timeOfZone)
+		if err != nil {
+			panic(fmt.Sprintf("[%v.%v]parse time fail, val:%v, time:%v", sheetName, headName, value, timeOfZone))
+		}
+		return protoreflect.ValueOfInt64(t.Unix())
+	case I18nName:
+		pkValue := s.GetI18nPrimaryKey(rowIdx)
+		i18nKey := MakeI18nKey(sheetName, headName, pkValue)
+		return protoreflect.ValueOfString(i18nKey)
+	default:
+		if root.hasEnumParser(typeName) {
+			return protoreflect.ValueOfEnum(protoreflect.EnumNumber(ToInt32(value)))
+		} else {
+			panic(fmt.Sprintf("[%v.%v]not support type %v", sheetName, headName, typeName))
+		}
+	}
+
+	return protoreflect.ValueOf(nil)
 }
