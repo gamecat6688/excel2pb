@@ -4,6 +4,7 @@ import "strings"
 
 const (
 	I18nName       = "i18n"
+	TimestampName  = "timestamp"
 	PrimaryKeyName = "pk"
 	UniqueName     = "unique"
 	RepeatedName   = "repeated"
@@ -80,6 +81,8 @@ func (h Head) ProtoType() string {
 		return h.Type()
 	} else if ss[0] == I18nName {
 		return "string"
+	} else if ss[0] == TimestampName {
+		return "int64"
 	}
 	return h.BaseType()
 }
