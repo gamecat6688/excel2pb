@@ -24,9 +24,9 @@ namespace Store
 			return id;
 		}
 
-		int id; // 编号
-		const char* desc; // 描述
-		int goldtype; // 货币
+		int id; // 缂栧彿
+		const char* desc; // 鎻忚堪
+		int goldtype; // 璐у竵
 
 		struct Goods
 		{
@@ -39,8 +39,8 @@ namespace Store
 			{
 			}
 
-			int itemid; // 道具
-			int price; // 价格
+			int itemid; // 閬撳叿
+			int price; // 浠锋牸
 		};
 		vector<Goods> goods;
 	};

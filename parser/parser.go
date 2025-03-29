@@ -26,7 +26,7 @@ func NewParser() *Parser {
 }
 
 func (p *Parser) ParseExcels() {
-	sss, err := filepath.Glob(fmt.Sprintf("%v/*.xlsx", config.ExcelDir))
+	sss, err := filepath.Glob(fmt.Sprintf("%v/*.xlsx", config.Cfg.ExcelDir))
 	if err != nil {
 		log.Println("err:", err)
 		return
@@ -145,9 +145,13 @@ func (p *Parser) exportProto() {
 
 // exportPb 导出pb
 func (p *Parser) exportPb() {
-	for filter, protoOutPath := range config.ProtoOutPaths {
+	for _, filter := range AllFilters {
+		cfg := config.Cfg.Outs[FilterFullName[filter]]
+
+		protoOutPath := cfg.ProtoPath
+		pbOutPath := cfg.PbPath
+
 		// make dirs
-		pbOutPath := config.PbOutPaths[filter]
 		os.MkdirAll(pbOutPath, os.ModePerm)
 
 		sss, err := filepath.Glob(fmt.Sprintf("%v/*.proto", protoOutPath))
@@ -156,13 +160,11 @@ func (p *Parser) exportPb() {
 			return
 		}
 
-		lan := config.GenerateLanguage[filter]
-
 		for _, filename := range sss {
 			argInclude := fmt.Sprintf("--proto_path=%v", protoOutPath)
 			argOut := ""
 
-			switch lan {
+			switch cfg.CodeLanguage {
 			case "golang":
 				argOut = fmt.Sprintf("--go_out=%v", pbOutPath)
 			case "csharp":
@@ -181,13 +183,6 @@ func (p *Parser) exportPb() {
 			}
 		}
 	}
-
-	//for _, v := range p.sheets {
-	//	for _, f := range AllFilters {
-	//		ns := v.SplitByFilter(f)
-	//		ns.ExportPb(p)
-	//	}
-	//}
 }
 
 func (p *Parser) exportData() {

@@ -1,0 +1,55 @@
+ExcelDir: assets/xls/
+
+ProtoImportPath: ""
+
+Outs:
+  Client:
+    ProtoPath: assets/out_proto/client/
+    PbPath:    assets/out_pb/client/
+    DataPath:  assets/out_data/client/
+    DataExt:  ".data"
+    PackageName:  "pb"
+    CodeLanguage:  "csharp"
+  Server:
+    ProtoPath: assets/out_proto/server/
+    PbPath: assets/out_pb/server/
+    DataPath: assets/out_data/server/
+    DataExt: ".data"
+    PackageName: "pbs"
+    CodeLanguage: "golang"
+
+ProtoOutPaths:
+  c: assets/out_proto/client/
+  s: assets/out_proto/server/
+
+PbOutPaths:
+  c: assets/out_pb/client/
+  s: assets/out_pb/server/
+
+DataOutPaths:
+  c: assets/out_data/client/
+  s: assets/out_data/server/
+
+DataExtensions:
+  c: ".data"
+  s: ".data"
+
+ProtoPackages:
+  c: "pb"
+  s: "pbs"
+
+GenerateLanguage:
+  c: "csharp"
+  s: "golang"
+
+TplCodePaths:
+  golang: assets/out_code/golang/
+  csharp: assets/out_code/csharp/
+  cpp:    assets/out_code/cpp/
+  java:   assets/out_code/java/
+
+CodeOutPaths:
+  golang: assets/template/golang/
+  csharp: assets/template/csharp/
+  cpp:    assets/template/cpp/
+  java:   assets/template/java/

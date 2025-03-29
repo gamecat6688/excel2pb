@@ -16,6 +16,11 @@ var (
 		ClientFlag,
 		ServerFlag,
 	}
+
+	FilterFullName = map[string]string{
+		ClientFlag: "Client",
+		ServerFlag: "Server",
+	}
 )
 
 // 字段功能

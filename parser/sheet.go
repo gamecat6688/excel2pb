@@ -326,27 +326,27 @@ func (s *SheetParser) SplitByFilter(filterName string) *SheetParser {
 }
 
 func (s *SheetParser) getPackageName() string {
-	return config.ProtoPackages[s.filter]
+	return config.Cfg.Outs[FilterFullName[s.filter]].PackageName
 }
 
 func (s *SheetParser) getProtoOutPath() string {
-	return config.ProtoOutPaths[s.filter]
+	return config.Cfg.Outs[FilterFullName[s.filter]].ProtoPath
 }
 
 func (s *SheetParser) getDataOutPath() string {
-	return config.DataOutPaths[s.filter]
+	return config.Cfg.Outs[FilterFullName[s.filter]].DataPath
 }
 
 func (s *SheetParser) getDataExtension() string {
-	return config.DataExtensions[s.filter]
+	return config.Cfg.Outs[FilterFullName[s.filter]].DataExt
 }
 
 func (s *SheetParser) getPbOutPath() string {
-	return config.PbOutPaths[s.filter]
+	return config.Cfg.Outs[FilterFullName[s.filter]].PbPath
 }
 
-func (s *SheetParser) getGenerateLanguage() string {
-	return config.GenerateLanguage[s.filter]
+func (s *SheetParser) getCodeLanguage() string {
+	return config.Cfg.Outs[FilterFullName[s.filter]].CodeLanguage
 }
 
 func (s *SheetParser) getDataFilePath() string {
@@ -407,7 +407,7 @@ func (s *SheetParser) ExportProto(root *Parser) {
 	for _, v := range importMessages {
 		// 引用其他proto
 		m.Imports = append(m.Imports, ImportModel{
-			ProtoPath: fmt.Sprintf(`"%v%v.proto";`, config.ProtoImportPath, v),
+			ProtoPath: fmt.Sprintf(`"%v%v.proto";`, config.Cfg.ProtoImportPath, v),
 		})
 	}
 
@@ -447,7 +447,7 @@ func (s *SheetParser) ExportProto(root *Parser) {
 //	argInclude := fmt.Sprintf("--proto_path=%v", s.getProtoOutPath())
 //	argOut := ""
 //
-//	switch s.getGenerateLanguage() {
+//	switch s.getCodeLanguage() {
 //	case "golang":
 //		argOut = fmt.Sprintf("--go_out=%v", s.getPbOutPath())
 //	case "csharp":

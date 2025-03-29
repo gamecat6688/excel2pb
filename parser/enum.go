@@ -63,7 +63,7 @@ func (s *EnumParser) Parse(f *excelize.File) bool {
 }
 
 func (s *EnumParser) getProtoOutPath(filter string) string {
-	return config.ProtoOutPaths[filter]
+	return config.Cfg.Outs[FilterFullName[filter]].ProtoPath
 }
 
 func (s *EnumParser) getProtoFilePath(filter string) string {
@@ -83,7 +83,7 @@ func (s *EnumParser) ExportProto(filter string) {
 	}
 
 	m := &ProtoEnumModel{
-		PackageName: config.ProtoPackages[filter],
+		PackageName: config.Cfg.Outs[FilterFullName[filter]].PackageName,
 		MessageName: s.name,
 	}
 
