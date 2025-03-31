@@ -3,6 +3,7 @@ module excel2pb
 go 1.22.10
 
 require (
+	github.com/bmatcuk/doublestar/v4 v4.8.1
 	github.com/bufbuild/protocompile v0.14.1
 	github.com/xuri/excelize/v2 v2.9.0
 	google.golang.org/protobuf v1.36.6
