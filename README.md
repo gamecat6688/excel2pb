@@ -29,6 +29,31 @@ excel导出protobuf二进制，并导出读取代码
     1. 基础类型：int, float, string, bool, timestamp, enum, struct
     2. 数组类型：repeated <typename>
 ```
+# excel文件夹结构说明
+## 支持一层文件夹结构
+```
+excel
+├── 物品.xlsx
+├── 商店.xlsx
+├── 升级.xlsx
+```
+
+## 支持多层文件夹结构
+```
+excel
+├── 物品
+│   ├── 货币.xlsx
+│   ├── 装备.xlsx
+│   ├── 材料.xlsx
+├── 商店.xlsx
+├── 升级.xlsx
+```
+
+# excel工作簿说明
+```
+导出的Message名称，根据sheet的名称生成，sheet的名称就是Message的名称。
+一个表格可以包含多个sheet，也可以只有一个sheet。
+```
 
 # TODO List
 - [ ] 支持多个主键

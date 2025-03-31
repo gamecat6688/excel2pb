@@ -3,6 +3,7 @@ package parser
 import (
 	"excel2pb/config"
 	"fmt"
+	"github.com/bmatcuk/doublestar/v4"
 	"github.com/xuri/excelize/v2"
 	"log"
 	"log/slog"
@@ -26,30 +27,16 @@ func NewParser() *Parser {
 }
 
 func (p *Parser) ParseExcels() {
-	sss, err := filepath.Glob(fmt.Sprintf("%v/*.xlsx", config.Cfg.ExcelDir))
+	// 读取所有文件夹(包含子文件夹)下的excel文件，排除~开头的临时文件
+	matches, err := doublestar.FilepathGlob(fmt.Sprintf("%v/**/[!~]*.xlsx", config.Cfg.ExcelDir))
 	if err != nil {
 		log.Println("err:", err)
 		return
 	}
 
-	// 遍历并过滤掉临时文件
-	var excels []string
-	for _, f := range sss {
-		if strings.HasPrefix(filepath.Base(f), "~") {
-			continue
-		}
-
-		//if strings.HasPrefix(filepath.Base(f), I18nSheetName) {
-		//	continue
-		//}
-
-		excels = append(excels, f)
-	}
-
 	// 并发解析excel
-
 	var wg sync.WaitGroup
-	for _, f := range excels {
+	for _, f := range matches {
 		wg.Add(1)
 		go func(fileName string) {
 			p.parseFromFile(fileName)
