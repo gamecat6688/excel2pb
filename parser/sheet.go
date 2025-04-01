@@ -583,6 +583,20 @@ func (s *SheetParser) ExportData(root *Parser) {
 	os.WriteFile(dataFilePath, data, os.ModePerm)
 }
 
+func (s *SheetParser) ExportCode() {
+	cfg := config.Cfg.Outs[FilterFullName[s.filter]]
+	tplCodePath := config.Cfg.TplCodePaths[cfg.CodeLanguage]
+	codeOutPath := config.Cfg.CodeOutPaths[cfg.CodeLanguage]
+	switch cfg.CodeLanguage {
+	case "golang":
+		moduleCode := NewGolangModuleCode(tplCodePath, codeOutPath)
+		moduleCode.GenCode(s)
+	case "csharp":
+		moduleCode := NewCsharpModuleCode(tplCodePath, codeOutPath)
+		moduleCode.GenCode(s)
+	}
+}
+
 func (s *SheetParser) procBaseProtoType(root *Parser, fd Head, rowIdx int32, value string) []protoreflect.Value {
 	var arrValue []protoreflect.Value
 	for _, v := range SplitBaseValue(value) {

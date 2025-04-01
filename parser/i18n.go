@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	I18nSheetName = "I18n"
+	I18nSheetName = "I18N"
 )
 
 func NewI18nParser(sheet *SheetParser) *I18nParser {
@@ -31,7 +31,7 @@ type I18nParser struct {
 func (i *I18nParser) initHeaders() {
 	var rows [][]string
 	rows = append(rows, []string{"ID", "Cn", "Tn", "En"})
-	rows = append(rows, []string{"unique string", "string", "string", "string"})
+	rows = append(rows, []string{"pk string", "string", "string", "string"})
 	rows = append(rows, []string{"cs", "cs", "cs", "cs"})
 	rows = append(rows, []string{"编号", "简体中文", "繁体中文", "英语"})
 	i.parseHeader(rows)

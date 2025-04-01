@@ -224,4 +224,31 @@ func (p *Parser) exportData() {
 }
 
 func (p *Parser) exportCode() {
+	p.exportLoadCode()
+	p.exportModuleCode()
+}
+
+func (p *Parser) exportLoadCode() {
+	for _, f := range AllFilters {
+		cfg := config.Cfg.Outs[FilterFullName[f]]
+		tplCodePath := config.Cfg.TplCodePaths[cfg.CodeLanguage]
+		codeOutPath := config.Cfg.CodeOutPaths[cfg.CodeLanguage]
+		switch cfg.CodeLanguage {
+		case "golang":
+			moduleCode := NewGolangLoaderCode(tplCodePath, codeOutPath)
+			moduleCode.GenCode(p)
+		case "csharp":
+			moduleCode := NewCsharpLoaderCode(tplCodePath, codeOutPath)
+			moduleCode.GenCode(p)
+		}
+	}
+}
+
+func (p *Parser) exportModuleCode() {
+	for _, v := range p.sheets {
+		for _, f := range AllFilters {
+			ns := v.SplitByFilter(f)
+			ns.ExportCode()
+		}
+	}
 }
