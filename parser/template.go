@@ -17,8 +17,7 @@ message {{.MessageName}}Config {
 
 message {{.MessageName}} {
 {{range .Fields}}  {{.ProtoType}} {{.FieldName}} = {{.FieldTag}}; // {{.Comment}}
-{{end}}
-}
+{{end}}}
 `
 )
 
@@ -33,8 +32,7 @@ option go_package = "/{{.PackageName}}";
 
 enum {{.MessageName}} {
 {{range .Fields}}  {{.FieldName}} = {{.FieldTag}}; // {{.Comment}}
-{{end}}
-}
+{{end}}}
 `
 )
 
@@ -60,4 +58,14 @@ type ProtoEnumModel struct {
 	MessageName string
 	Imports     []ImportModel
 	Fields      []FieldModel
+}
+
+type CodeLoaderModel struct {
+	Names []string
+}
+
+type CodeModuleModel struct {
+	Name    string
+	KeyType string
+	KeyName string
 }
