@@ -1,8 +1,9 @@
 package config
 
 import (
-	"gopkg.in/yaml.v3"
 	"os"
+
+	"gopkg.in/yaml.v3"
 )
 
 type OutConfig struct {
@@ -98,8 +99,8 @@ Outs:
 TplCodePaths:
   golang: assets/template/golang/
   csharp: assets/template/csharp/
-  cpp:    assets/template/cpp/
-  java:   assets/template/java/
+  cpp: assets/template/cpp/
+  java: assets/template/java/
 
 CodeOutPaths:
   golang: assets/out_code/golang/
