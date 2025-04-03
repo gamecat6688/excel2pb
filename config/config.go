@@ -27,6 +27,9 @@ type OutConfig struct {
 }
 
 type Config struct {
+	// 最大并发数
+	MaxProcess int `yaml:"MaxProcess"`
+
 	TimeZone string `yaml:"TimeZone"`
 
 	EnableI18n bool `yaml:"EnableI18n"`
@@ -75,6 +78,7 @@ func loadConfigFromData(data []byte) (*Config, error) {
 }
 
 var defaultConfigData = `
+MaxProcess: 0
 TimeZone: "+08:00"
 EnableI18n: true
 ExcelDir: assets/xls/
