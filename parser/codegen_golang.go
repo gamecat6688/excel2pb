@@ -117,7 +117,7 @@ func (g *GolangModuleCodeGenerator) GenCode(sheet *SheetParser) bool {
 		if strings.Index(baseName, `{name}`) != -1 {
 			fixedName = strings.Replace(baseName, `{name}`, strings.ToLower(sheet.sheetName), -1)
 		} else if strings.Index(baseName, `{Name}`) != -1 {
-			fixedName = strings.Replace(baseName, `{name}`, strings.ToUpper(sheet.sheetName), -1)
+			fixedName = strings.Replace(baseName, `{Name}`, sheet.sheetName, -1)
 		} else {
 			panic("invalid template name")
 		}
