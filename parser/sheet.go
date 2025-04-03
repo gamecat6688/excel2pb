@@ -6,7 +6,6 @@ import (
 	"github.com/xuri/excelize/v2"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
-	"log"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -504,18 +503,21 @@ func (s *SheetParser) ExportData(root *Parser) {
 	protoNames := s.getAllProtoFiles(root)
 	resolver, err := parseProtoFile(protoNames, []string{s.getProtoOutPath()})
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("parseProtoFile fail", "error", err, "filter", s.filter)
+		return
 	}
 
 	// 2. 获取消息描述符
 	configMsgName := fmt.Sprintf("%v.%v", s.getPackageName(), s.sheetName)
 	configMsgType, err := getMessageType(resolver, configMsgName+"Config")
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("getMessageType fail", "error", err, "filter", s.filter)
+		return
 	}
 	recordMsgType, err := getMessageType(resolver, configMsgName)
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("getMessageType fail", "error", err, "filter", s.filter)
+		return
 	}
 
 	// 5. 构造多个 record 数据
@@ -531,7 +533,8 @@ func (s *SheetParser) ExportData(root *Parser) {
 				subMsgName := fmt.Sprintf("%v.%v", s.getPackageName(), fd.BaseType())
 				subMsgType, err2 := getMessageType(resolver, subMsgName)
 				if err2 != nil {
-					log.Fatal(err2)
+					slog.Error("getMessageType fail", "error", err2, "filter", s.filter)
+					return
 				}
 
 				customs := s.procCustomProtoType(root, subMsgType, fd, int32(rowIdx), value)
