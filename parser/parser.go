@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/xuri/excelize/v2"
-	"log"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -35,7 +34,7 @@ func (p *Parser) ParseExcels() {
 	// 读取所有文件夹(包含子文件夹)下的excel文件，排除~开头的临时文件
 	matches, err := doublestar.FilepathGlob(fmt.Sprintf("%v/**/[!~]*.xlsx", config.Cfg.ExcelDir))
 	if err != nil {
-		log.Println("err:", err)
+		slog.Error("ParseExcels fail", "error", err)
 		return
 	}
 
@@ -221,7 +220,7 @@ func (p *Parser) exportPb() {
 
 		sss, err := filepath.Glob(fmt.Sprintf("%v/*.proto", protoOutPath))
 		if err != nil {
-			log.Println("err:", err)
+			slog.Error("export pb fail", "error", err)
 			return
 		}
 
@@ -246,7 +245,7 @@ func (p *Parser) exportPb() {
 				cmd := exec.Command("protoc", argInclude, argOut, filename)
 				err = cmd.Run()
 				if err != nil {
-					slog.Error("protoc failed", "error", err)
+					slog.Error("protoc failed", "error", err, "filename", filename)
 					//log.Fatalf("protoc failed: %v", err)
 				}
 			})

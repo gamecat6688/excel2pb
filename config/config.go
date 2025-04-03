@@ -38,6 +38,8 @@ type Config struct {
 
 	ProtoImportPath string `yaml:"ProtoImportPath"`
 
+	LogLevel string `yaml:"LogLevel"`
+
 	Outs map[string]OutConfig `yaml:"Outs"`
 
 	CodeOutPaths map[string]string `yaml:"CodeOutPaths"`
@@ -83,6 +85,7 @@ TimeZone: "+08:00"
 EnableI18n: true
 ExcelDir: assets/xls/
 ProtoImportPath: ""
+LogLevel: INFO
 
 Outs:
   Client:

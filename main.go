@@ -11,6 +11,10 @@ import (
 func main() {
 	config.LoadConfig()
 
+	var logLevel slog.Level
+	logLevel.UnmarshalText([]byte(config.Cfg.LogLevel))
+	slog.SetLogLoggerLevel(logLevel)
+
 	if config.Cfg.MaxProcess > 0 {
 		runtime.GOMAXPROCS(config.Cfg.MaxProcess)
 	}
@@ -21,6 +25,4 @@ func main() {
 	p.ParseExcels()
 	p.MergeI18n()
 	p.Export()
-
-	println("exit app")
 }
