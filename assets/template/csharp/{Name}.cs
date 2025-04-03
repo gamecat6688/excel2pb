@@ -6,11 +6,11 @@ namespace Data
 {
     public class {{.Name}}Model : Singleton<{{.Name}}Model>
     {
-        internal Dictionary<{{.KeyType}}, pb.{{.Name}}> rows = new Dictionary<{{.KeyType}}, pb.{{.Name}}>();
+        private Dictionary<{{.KeyType}}, {{.Name}}> rows = new ();
 
         public void Init()
         {
-            var cfg = Loader.Load(new {{.Name}}Config()) as {{.Name}}onfig;
+            var cfg = Loader.Load(new {{.Name}}Config()) as {{.Name}}Config;
             foreach (var r in cfg.Records)
             {
                 rows[r.ID] = r;
@@ -29,12 +29,12 @@ namespace Data
             return rows.ContainsKey(id);
         }
         
-        public pb.{{.Name}} Get({{.KeyType}} id)
+        public {{.Name}} Get({{.KeyType}} id)
         {
             return rows[id];
         }
         
-        public Dictionary<{{.KeyType}}, pb.{{.Name}}> GetRows()
+        public Dictionary<{{.KeyType}}, {{.Name}}> GetRows()
         {
             return rows;
         }
