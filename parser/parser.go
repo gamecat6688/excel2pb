@@ -2,6 +2,7 @@ package parser
 
 import (
 	"excel2pb/config"
+	"excel2pb/works"
 	"fmt"
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/xuri/excelize/v2"
@@ -17,6 +18,8 @@ import (
 type Parser struct {
 	sheets map[string]*SheetParser
 	enums  map[string]*EnumParser
+	sync.Map
+	sync.RWMutex
 }
 
 func NewParser() *Parser {
@@ -27,6 +30,8 @@ func NewParser() *Parser {
 }
 
 func (p *Parser) ParseExcels() {
+	slog.Info("parse excels start")
+
 	// 读取所有文件夹(包含子文件夹)下的excel文件，排除~开头的临时文件
 	matches, err := doublestar.FilepathGlob(fmt.Sprintf("%v/**/[!~]*.xlsx", config.Cfg.ExcelDir))
 	if err != nil {
@@ -35,15 +40,15 @@ func (p *Parser) ParseExcels() {
 	}
 
 	// 并发解析excel
-	var wg sync.WaitGroup
-	for _, f := range matches {
-		wg.Add(1)
-		go func(fileName string) {
+	for _, fileName := range matches {
+		works.Go(func() {
+			slog.Info("parsing excel", "fileName", fileName)
 			p.parseFromFile(fileName)
-			wg.Done()
-		}(f)
+		})
 	}
-	wg.Wait()
+	works.Wait()
+
+	slog.Info("parse excels over")
 }
 
 func (p *Parser) parseFromFile(excelFile string) {
@@ -74,7 +79,9 @@ func (p *Parser) parseFromFile(excelFile string) {
 				return
 			}
 
+			p.Lock()
 			p.enums[enumName] = ps
+			p.Unlock()
 		} else {
 			// 数据表
 			if p.hasSheetParser(sheetName) {
@@ -87,7 +94,9 @@ func (p *Parser) parseFromFile(excelFile string) {
 			ps.ParseRows(rows)
 			ps.ParseHeadTags(f)
 
+			p.Lock()
 			p.sheets[sheetName] = ps
+			p.Unlock()
 		}
 	}
 }
@@ -100,6 +109,8 @@ func (p *Parser) MergeI18n() {
 	if !config.Cfg.EnableI18n {
 		return
 	}
+
+	slog.Info("merge i18n start")
 
 	//defer TimeCost("MergeI18n")()
 
@@ -126,50 +137,75 @@ func (p *Parser) MergeI18n() {
 
 	i18n.WriteToExcel(p.GetI18nFilePath())
 
+	p.Lock()
 	p.sheets[I18nSheetName] = i18n.SheetParser
+	p.Unlock()
+
+	slog.Info("merge i18n end")
 }
 
 func (p *Parser) Export() {
 	p.checks()
 	p.exportProto()
 	p.exportData()
-	p.exportPb()
 	p.exportCode()
+	p.exportPb()
 }
 
 func (p *Parser) hasSheetParser(sheetName string) bool {
+	p.RLock()
+	defer p.RUnlock()
+
 	_, ok := p.sheets[sheetName]
 	return ok
 }
 
 func (p *Parser) getSheetParser(sheetName string) *SheetParser {
+	p.RLock()
+	defer p.RUnlock()
+
 	return p.sheets[sheetName]
 }
 
 func (p *Parser) hasEnumParser(sheetName string) bool {
+	p.RLock()
+	defer p.RUnlock()
+
 	_, ok := p.enums[sheetName]
 	return ok
 }
 
 func (p *Parser) checks() {
 	for _, sheet := range p.sheets {
-		sheet.checks(p)
+		works.Go(func() {
+			slog.Info("check excels", "sheetName", sheet.sheetName)
+			sheet.checks(p)
+		})
 	}
+	works.Wait()
 }
 
 func (p *Parser) exportProto() {
 	for _, v := range p.enums {
 		for _, f := range AllFilters {
-			v.ExportProto(f)
+			works.Go(func() {
+				slog.Info("export enum proto", "sheetName", v.sheetName, "filter", f)
+				v.ExportProto(f)
+			})
 		}
 	}
 
 	for _, v := range p.sheets {
 		for _, f := range AllFilters {
-			ns := v.SplitByFilter(f)
-			ns.ExportProto(p)
+			works.Go(func() {
+				slog.Info("export message proto", "sheetName", v.sheetName, "filter", f)
+				ns := v.SplitByFilter(f)
+				ns.ExportProto(p)
+			})
 		}
 	}
+
+	works.Wait()
 }
 
 // exportPb 导出pb
@@ -190,6 +226,8 @@ func (p *Parser) exportPb() {
 		}
 
 		for _, filename := range sss {
+			slog.Info("export pb file", "filename", filename)
+
 			argInclude := fmt.Sprintf("--proto_path=%v", protoOutPath)
 			argOut := ""
 
@@ -204,23 +242,32 @@ func (p *Parser) exportPb() {
 				argOut = fmt.Sprintf("--cpp_out=%v", pbOutPath)
 			}
 
-			cmd := exec.Command("protoc", argInclude, argOut, filename)
-			err = cmd.Run()
-			if err != nil {
-				slog.Error("protoc failed", "error", err)
-				//log.Fatalf("protoc failed: %v", err)
-			}
+			works.Go(func() {
+				cmd := exec.Command("protoc", argInclude, argOut, filename)
+				err = cmd.Run()
+				if err != nil {
+					slog.Error("protoc failed", "error", err)
+					//log.Fatalf("protoc failed: %v", err)
+				}
+			})
 		}
 	}
+
+	works.Wait()
 }
 
 func (p *Parser) exportData() {
 	for _, v := range p.sheets {
 		for _, f := range AllFilters {
-			ns := v.SplitByFilter(f)
-			ns.ExportData(p)
+			works.Go(func() {
+				slog.Info("export bin file", "sheetName", v.sheetName, "filter", f)
+				ns := v.SplitByFilter(f)
+				ns.ExportData(p)
+			})
 		}
 	}
+
+	works.Wait()
 }
 
 func (p *Parser) exportCode() {
@@ -230,6 +277,8 @@ func (p *Parser) exportCode() {
 
 func (p *Parser) exportLoadCode() {
 	for _, f := range AllFilters {
+		slog.Info("export load code", "filter", f)
+
 		cfg := config.Cfg.Outs[FilterFullName[f]]
 		tplCodePath := config.Cfg.TplCodePaths[cfg.CodeLanguage]
 		codeOutPath := config.Cfg.CodeOutPaths[cfg.CodeLanguage]
@@ -247,8 +296,13 @@ func (p *Parser) exportLoadCode() {
 func (p *Parser) exportModuleCode() {
 	for _, v := range p.sheets {
 		for _, f := range AllFilters {
-			ns := v.SplitByFilter(f)
-			ns.ExportCode()
+			works.Go(func() {
+				slog.Info("export module code", "sheetName", v.sheetName, "filter", f)
+				ns := v.SplitByFilter(f)
+				ns.ExportCode()
+			})
 		}
 	}
+
+	works.Wait()
 }
