@@ -141,7 +141,10 @@ func (g *GolangModuleCodeGenerator) GenCode(root *Parser, sheet *SheetParser) bo
 			}
 
 			keyName = fd.Name()
+		} else {
+			panic(fmt.Sprintf("not found PrimaryKey when golang GenCode, sheetName: %v", sheet.sheetName))
 		}
+
 		m := &CodeModuleModel{
 			Name:     sheet.sheetName,
 			FullName: fmt.Sprintf("%v.%v", sheet.getPackageName(), sheet.sheetName),
