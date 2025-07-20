@@ -3,7 +3,7 @@ package data
 import "server/pbs"
 
 type {{.Name}} struct {
-	*pbs.{{.Name}}
+	*{{.FullName}}
 }
 
 func Get{{.Name}}Model() *{{.Name}}Model {
@@ -15,7 +15,7 @@ func New{{.Name}}Model() *{{.Name}}Model {
 		DefaultModel: NewDefaultModel[{{.KeyType}}, *{{.Name}}](),
 	}
 
-	cfg := &pbs.{{.Name}}Config{}
+	cfg := &{{.FullName}}Config{}
 	load(cfg)
 	for _, v := range cfg.Records {
 		m.rows[v.{{.KeyName}}] = &{{.Name}}{v}

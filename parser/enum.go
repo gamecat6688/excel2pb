@@ -2,6 +2,7 @@ package parser
 
 import (
 	"excel2pb/config"
+	"fmt"
 	"github.com/xuri/excelize/v2"
 	"log/slog"
 	"os"
@@ -60,6 +61,18 @@ func (s *EnumParser) Parse(f *excelize.File) bool {
 	}
 
 	return true
+}
+
+// 获取枚举值
+func (s *EnumParser) getEnumValue(enumName string) int32 {
+	for _, v := range s.enums {
+		if v.Name == enumName {
+			return ToInt32(v.Value)
+		}
+	}
+
+	panic(fmt.Sprintf("[%v.%v]not found enumName support type %v", s.sheetName, s.name, enumName))
+	return 0
 }
 
 func (s *EnumParser) getProtoOutPath(filter string) string {

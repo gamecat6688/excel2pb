@@ -93,7 +93,7 @@ func NewCsharpModuleCode(tplPath, outPath string) *CsharpModuleCodeGenerator {
 	}
 }
 
-func (g *CsharpModuleCodeGenerator) GenCode(sheet *SheetParser) bool {
+func (g *CsharpModuleCodeGenerator) GenCode(root *Parser, sheet *SheetParser) bool {
 	if !sheet.HasData() {
 		// 没有数据，不生成代码
 		return false
