@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -141,12 +142,24 @@ func (g *CsharpModuleCodeGenerator) GenCode(root *Parser, sheet *SheetParser) bo
 		if len(sheet.GetPrimaryKeys()) > 0 {
 			// TODO 取第一个主键的类型，后续可以扩展
 			fd := sheet.GetPrimaryKeys()[0]
-			keyType = fd.BaseType()
+			if fd.IsCustomEnum(root) {
+				keyType = fd.BaseType()
+			} else {
+				var ok bool
+				keyType, ok = CSharpTypeMap[fd.BaseType()]
+				if !ok {
+					panic(fmt.Sprintf("invalid csharp type %v", fd.BaseType()))
+				}
+			}
+
 			keyName = fd.Name()
+		} else {
+			panic(fmt.Sprintf("not found PrimaryKey when csharp GenCode, sheetName: %v", sheet.sheetName))
 		}
+
 		m := &CodeModuleModel{
 			Name:    sheet.sheetName,
-			KeyType: CSharpTypeMap[keyType],
+			KeyType: keyType,
 			KeyName: keyName,
 		}
 		err = tmpl.Execute(f, m)

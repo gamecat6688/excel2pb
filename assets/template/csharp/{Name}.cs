@@ -4,7 +4,7 @@ using pb;
 
 namespace Data
 {
-    public class {{.Name}}Model : Singleton<{{.Name}}Model>
+    public partial class {{.Name}}Model : Singleton<{{.Name}}Model>
     {
         private Dictionary<{{.KeyType}}, {{.Name}}> rows = new ();
 
@@ -13,7 +13,7 @@ namespace Data
             var cfg = Loader.Load(new {{.Name}}Config()) as {{.Name}}Config;
             foreach (var r in cfg.Records)
             {
-                rows[r.ID] = r;
+                rows[r.{{.KeyName}}] = r;
             }
 
             onInit();
@@ -24,14 +24,14 @@ namespace Data
             
         }
     
-        public bool Has({{.KeyType}} id)
+        public bool Has({{.KeyType}} key)
         {
-            return rows.ContainsKey(id);
+            return rows.ContainsKey(key);
         }
         
-        public {{.Name}} Get({{.KeyType}} id)
+        public {{.Name}} Get({{.KeyType}} key)
         {
-            return rows[id];
+            return rows[key];
         }
         
         public Dictionary<{{.KeyType}}, {{.Name}}> GetRows()
