@@ -586,17 +586,17 @@ func (s *SheetParser) ExportData(root *Parser) {
 	os.WriteFile(dataFilePath, data, os.ModePerm)
 }
 
-func (s *SheetParser) ExportCode() {
+func (s *SheetParser) ExportCode(root *Parser) {
 	cfg := config.Cfg.Outs[FilterFullName[s.filter]]
 	tplCodePath := config.Cfg.TplCodePaths[cfg.CodeLanguage]
 	codeOutPath := config.Cfg.CodeOutPaths[cfg.CodeLanguage]
 	switch cfg.CodeLanguage {
 	case "golang":
 		moduleCode := NewGolangModuleCode(tplCodePath, codeOutPath)
-		moduleCode.GenCode(s)
+		moduleCode.GenCode(root, s)
 	case "csharp":
 		moduleCode := NewCsharpModuleCode(tplCodePath, codeOutPath)
-		moduleCode.GenCode(s)
+		moduleCode.GenCode(root, s)
 	}
 }
 
@@ -659,7 +659,16 @@ func (s *SheetParser) TypeNameToValue(root *Parser, fd Head, rowIdx int32, value
 		return protoreflect.ValueOfString(i18nKey)
 	default:
 		if root.hasEnumParser(typeName) {
-			return protoreflect.ValueOfEnum(protoreflect.EnumNumber(ToInt32(value)))
+			// 枚举类型处理
+			if IsNumber(value) {
+				// 配置的枚举值
+				return protoreflect.ValueOfEnum(protoreflect.EnumNumber(ToInt32(value)))
+			} else {
+				// 配置的枚举名
+				enumParser := root.getEnumParser(typeName)
+				enumValue := enumParser.getEnumValue(value)
+				return protoreflect.ValueOfEnum(protoreflect.EnumNumber(enumValue))
+			}
 		} else {
 			panic(fmt.Sprintf("[%v.%v]not support type %v", sheetName, headName, typeName))
 		}

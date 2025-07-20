@@ -65,7 +65,8 @@ type CodeLoaderModel struct {
 }
 
 type CodeModuleModel struct {
-	Name    string
-	KeyType string
-	KeyName string
+	Name     string
+	FullName string
+	KeyType  string
+	KeyName  string
 }

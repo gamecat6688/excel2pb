@@ -174,6 +174,13 @@ func (p *Parser) hasEnumParser(sheetName string) bool {
 	return ok
 }
 
+func (p *Parser) getEnumParser(sheetName string) *EnumParser {
+	p.RLock()
+	defer p.RUnlock()
+
+	return p.enums[sheetName]
+}
+
 func (p *Parser) checks() {
 	for _, sheet := range p.sheets {
 		works.Go(func() {
@@ -298,7 +305,7 @@ func (p *Parser) exportModuleCode() {
 			works.Go(func() {
 				slog.Info("export module code", "sheetName", v.sheetName, "filter", f)
 				ns := v.SplitByFilter(f)
-				ns.ExportCode()
+				ns.ExportCode(p)
 			})
 		}
 	}

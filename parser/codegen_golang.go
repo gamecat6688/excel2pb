@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -85,7 +86,7 @@ func (g *GolangModuleCodeGenerator) ImportTemplate() bool {
 	return true
 }
 
-func (g *GolangModuleCodeGenerator) GenCode(sheet *SheetParser) bool {
+func (g *GolangModuleCodeGenerator) GenCode(root *Parser, sheet *SheetParser) bool {
 	if !sheet.HasData() {
 		// 没有数据，不生成代码
 		return false
@@ -133,13 +134,19 @@ func (g *GolangModuleCodeGenerator) GenCode(sheet *SheetParser) bool {
 		if len(sheet.GetPrimaryKeys()) > 0 {
 			// TODO 取第一个主键的类型，后续可以扩展
 			fd := sheet.GetPrimaryKeys()[0]
-			keyType = fd.BaseType()
+			if fd.IsCustomEnum(root) {
+				keyType = fmt.Sprintf("%v.%v", sheet.getPackageName(), fd.BaseType())
+			} else {
+				keyType = fd.BaseType()
+			}
+
 			keyName = fd.Name()
 		}
 		m := &CodeModuleModel{
-			Name:    sheet.sheetName,
-			KeyType: keyType,
-			KeyName: keyName,
+			Name:     sheet.sheetName,
+			FullName: fmt.Sprintf("%v.%v", sheet.getPackageName(), sheet.sheetName),
+			KeyType:  keyType,
+			KeyName:  keyName,
 		}
 		err = tmpl.Execute(f, m)
 		if err != nil {
