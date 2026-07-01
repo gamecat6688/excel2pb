@@ -13,7 +13,7 @@ namespace Data
             var cfg = Loader.Load(new {{.Name}}Config()) as {{.Name}}Config;
             foreach (var r in cfg.Records)
             {
-                rows[r.{{.KeyName}}] = r;
+                rows[{{if .MultiKey}}({{range $i, $k := .Keys}}{{if $i}}, {{end}}r.{{$k.Name}}{{end}}){{else}}r.{{.KeyName}}{{end}}] = r;
             }
 
             onInit();
