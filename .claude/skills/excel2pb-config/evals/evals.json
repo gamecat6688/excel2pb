@@ -1,0 +1,26 @@
+{
+  "skill_name": "excel2pb-config",
+  "evals": [
+    {
+      "id": 0,
+      "name": "design-skill-table",
+      "prompt": "我在做游戏配置表（excel2pb 那套）。帮我在 assets/xls 下新建一张技能配置表，sheet 名叫 Skill。字段要有：技能ID、技能名（要做多语言）、技能类型（枚举：主动 Active、被动 Passive）、冷却秒数、伤害值、释放需要消耗的道具（引用物品表 Item 的道具）。物品表 物品.xlsx 已经有了。把表建出来，该加的约束和批注都加上。",
+      "expected_output": "生成/修改一个含 Skill sheet 的 xlsx：4 行表头正确；技能ID 为 pk；技能名类型为 i18n；技能类型为枚举并附带一张 SkillType_Enum 表(首项 Invalid=0，再 Active/Passive)；消耗道具字段在第1行加 fk:Item.ID 批注；导出过滤合理(主键 cs)。",
+      "files": ["files/物品.xlsx"]
+    },
+    {
+      "id": 1,
+      "name": "fill-shop-data",
+      "prompt": "这个 商店.xlsx 里的 Shop 表还没填数据。帮我加 3 个商品：1) 初级药水礼包，卖 100 金币，买了给 5 个初级药水(道具2001)；2) 宝石袋，卖 500，给 2 个魔法宝石(道具2002)和 1 个初级药水；3) 豪华礼包，卖 1000，给 10 个初级药水 + 3 个魔法宝石。商品名要做多语言。",
+      "expected_output": "在 Shop 表第5行起写入3条数据：ID 唯一；Name 填中文源文本(不是key)；Price 为整数；Rewards 用嵌套编码 ItemID|Count，元素间用 ; 分隔(如 2001|5;2002|... )，且引用的道具ID都在 Item 表中(2001/2002)。",
+      "files": ["files/商店.xlsx"]
+    },
+    {
+      "id": 2,
+      "name": "validate-before-export",
+      "prompt": "跑 excel2pb 导出前帮我检查一下这个 怪物.xlsx，看有没有会导出失败或者数据不对的地方，列出问题和怎么改。",
+      "expected_output": "指出全部4类问题：Monster 表 ID=5 主键重复；DropItemID=9999 外键指向 Item 表不存在的行；SpawnTime '2025/03/01 09:00' 时间戳格式错误(应为 YYYY-MM-DD HH:MM:SS)；Tips 表含 i18n 字段但没有主键。并给出对应 Excel 行号和修改建议。",
+      "files": ["files/怪物.xlsx"]
+    }
+  ]
+}
