@@ -64,9 +64,26 @@ type CodeLoaderModel struct {
 	Names []string
 }
 
+// KeyField 主键字段（名称+类型），用于生成组合主键
+type KeyField struct {
+	Type string
+	Name string
+}
+
 type CodeModuleModel struct {
 	Name     string
 	FullName string
-	KeyType  string
-	KeyName  string
+
+	// KeyType 单主键时为主键类型；多主键时为组合key类型
+	// (golang: 生成的key结构体名; csharp: ValueTuple 如 "(int, long)")
+	KeyType string
+
+	// KeyName 第一个主键的字段名，单主键模板使用
+	KeyName string
+
+	// Keys 全部主键字段，按列顺序
+	Keys []KeyField
+
+	// MultiKey 是否多主键
+	MultiKey bool
 }

@@ -223,17 +223,32 @@ func (s *SheetParser) checks(root *Parser) {
 	s.checkTags(root)
 }
 
-// TODO 当前主键只支持一个字段，需要扩展到多个字段
+// checkPrimaryKey 主键唯一性检测
+// 单主键：该列唯一；多主键：按组合唯一（符合复合主键语义，单列可重复，组合唯一）
 func (s *SheetParser) checkPrimaryKey(root *Parser) {
-	for _, head := range s.headers {
-		// 当前表的数据唯一性检测
-		if head.IsPrimaryKey() {
-			value, ok := s.checkFiledValueIsUnique(head.Name())
-			if !ok {
-				panic(fmt.Sprintf("[%v.%v]check pk fail, has same value %v",
-					s.sheetName, head.Name(), value))
-			}
+	pks := s.GetPrimaryKeys()
+	if len(pks) == 0 {
+		return
+	}
+
+	seen := make(map[string]bool)
+	for rowIndex := range s.dataRows {
+		parts := make([]string, 0, len(pks))
+		for _, pk := range pks {
+			parts = append(parts, s.getFiledValue(pk.Name(), int32(rowIndex)))
 		}
+		// \x00 作为分隔符，避免不同组合拼接后碰撞
+		key := strings.Join(parts, "\x00")
+		if seen[key] {
+			names := make([]string, 0, len(pks))
+			for _, pk := range pks {
+				names = append(names, pk.Name())
+			}
+			panic(fmt.Sprintf("[%v]check pk fail, duplicate key (%v)=(%v) at excel row %v",
+				s.sheetName, strings.Join(names, ","), strings.Join(parts, ","),
+				DataRowIndex2ExcelRow(int32(rowIndex))))
+		}
+		seen[key] = true
 	}
 }
 

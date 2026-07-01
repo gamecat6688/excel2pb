@@ -138,10 +138,14 @@ func (g *CsharpModuleCodeGenerator) GenCode(root *Parser, sheet *SheetParser) bo
 		}
 
 		// 执行模板,输出文件
-		var keyType, keyName string
-		if len(sheet.GetPrimaryKeys()) > 0 {
-			// TODO 取第一个主键的类型，后续可以扩展
-			fd := sheet.GetPrimaryKeys()[0]
+		pks := sheet.GetPrimaryKeys()
+		if len(pks) == 0 {
+			panic(fmt.Sprintf("not found PrimaryKey when csharp GenCode, sheetName: %v", sheet.sheetName))
+		}
+
+		keys := make([]KeyField, 0, len(pks))
+		for _, fd := range pks {
+			var keyType string
 			if fd.IsCustomEnum(root) {
 				keyType = fd.BaseType()
 			} else {
@@ -151,16 +155,26 @@ func (g *CsharpModuleCodeGenerator) GenCode(root *Parser, sheet *SheetParser) bo
 					panic(fmt.Sprintf("invalid csharp type %v", fd.BaseType()))
 				}
 			}
+			keys = append(keys, KeyField{Type: keyType, Name: fd.Name()})
+		}
 
-			keyName = fd.Name()
-		} else {
-			panic(fmt.Sprintf("not found PrimaryKey when csharp GenCode, sheetName: %v", sheet.sheetName))
+		multiKey := len(keys) > 1
+		keyType := keys[0].Type
+		if multiKey {
+			// 多主键：使用 ValueTuple 作为字典key，如 (int, long)
+			parts := make([]string, 0, len(keys))
+			for _, k := range keys {
+				parts = append(parts, k.Type)
+			}
+			keyType = "(" + strings.Join(parts, ", ") + ")"
 		}
 
 		m := &CodeModuleModel{
-			Name:    sheet.sheetName,
-			KeyType: keyType,
-			KeyName: keyName,
+			Name:     sheet.sheetName,
+			KeyType:  keyType,
+			KeyName:  keys[0].Name,
+			Keys:     keys,
+			MultiKey: multiKey,
 		}
 		err = tmpl.Execute(f, m)
 		if err != nil {

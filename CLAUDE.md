@@ -17,7 +17,7 @@ go build -o excel2pb.exe main.go     # 或运行 build_windows.bat / build_all.b
 ./excel2pb.exe                        # 读取 config.yaml + assets/xls/，输出到 assets/out_*
 ```
 
-仓库中**没有测试**（`go test ./...` 找不到任何测试）。
+测试：`go test ./parser/`（注意不要用 `go test ./...` 或 `go build ./...`——`assets/template/` 下的 `.go` 是 text/template 模板，不是合法 Go，会编译失败）。目前仅 `parser/multikey_render_test.go` 一个渲染测试。
 
 **外部运行时依赖**（必须在 PATH 中）：`protoc`，以及每种配置语言对应的 codegen 插件（例如 golang 需要 `protoc-gen-go`）。`exportPb` 阶段会 shell 调用 `protoc`，且只记录错误——插件缺失时会生成空的 `out_pb/` 而不会硬报错。
 
@@ -55,4 +55,11 @@ go build -o excel2pb.exe main.go     # 或运行 build_windows.bat / build_all.b
 - **Loader**（`GenCode(root)`）：每种语言运行一次，遍历文件名**不含** `{`/`}` 的模板文件，拿到排序后的 sheet 名列表。
 - **Module**（`GenCode(root, sheet)`）：每个 sheet 运行一次，遍历文件名**含** `{name}`/`{Name}` 的模板文件（小写/原样），替换进输出文件名。模板目录为 `assets/template/<lang>/`。
 
-即使目标不是 Go，模板也是 Go 的 `text/template`（`.cs`、`.h` 等）。module 生成器要求每个数据表都有主键，并用第一个主键作为 map 的 key。
+即使目标不是 Go，模板也是 Go 的 `text/template`（`.cs`、`.h` 等）。module 生成器要求每个数据表都有主键。
+
+## 多主键
+
+一个表可声明多个 `pk` 列，语义为复合主键：`checkPrimaryKey` 按主键**组合**去重（单列可重复，组合唯一）。codegen 通过 `CodeModuleModel.Keys`（`[]KeyField`）+ `MultiKey` 传给模板：
+- **单主键**：输出与旧版逐字节一致（`map[T]` / `Dictionary<T,>`，直接用字段名作 key）。
+- **多主键**：golang 生成组合 key 结构体 `<表名>Key{...}` 并以其为 map key；csharp 用 ValueTuple `(t1, t2)` 作 `Dictionary` key。
+`GetI18nPrimaryKey` 用 `_` 拼接所有主键值作为 i18n key 的一部分。

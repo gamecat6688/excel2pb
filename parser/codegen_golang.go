@@ -130,26 +130,36 @@ func (g *GolangModuleCodeGenerator) GenCode(root *Parser, sheet *SheetParser) bo
 		}
 
 		// 执行模板,输出文件
-		var keyType, keyName string
-		if len(sheet.GetPrimaryKeys()) > 0 {
-			// TODO 取第一个主键的类型，后续可以扩展
-			fd := sheet.GetPrimaryKeys()[0]
+		pks := sheet.GetPrimaryKeys()
+		if len(pks) == 0 {
+			panic(fmt.Sprintf("not found PrimaryKey when golang GenCode, sheetName: %v", sheet.sheetName))
+		}
+
+		keys := make([]KeyField, 0, len(pks))
+		for _, fd := range pks {
+			var keyType string
 			if fd.IsCustomEnum(root) {
 				keyType = fmt.Sprintf("%v.%v", sheet.getPackageName(), fd.BaseType())
 			} else {
 				keyType = fd.BaseType()
 			}
+			keys = append(keys, KeyField{Type: keyType, Name: fd.Name()})
+		}
 
-			keyName = fd.Name()
-		} else {
-			panic(fmt.Sprintf("not found PrimaryKey when golang GenCode, sheetName: %v", sheet.sheetName))
+		multiKey := len(keys) > 1
+		keyType := keys[0].Type
+		if multiKey {
+			// 多主键：生成组合key结构体，类型名为 <表名>Key
+			keyType = sheet.sheetName + "Key"
 		}
 
 		m := &CodeModuleModel{
 			Name:     sheet.sheetName,
 			FullName: fmt.Sprintf("%v.%v", sheet.getPackageName(), sheet.sheetName),
 			KeyType:  keyType,
-			KeyName:  keyName,
+			KeyName:  keys[0].Name,
+			Keys:     keys,
+			MultiKey: multiKey,
 		}
 		err = tmpl.Execute(f, m)
 		if err != nil {
