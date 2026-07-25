@@ -117,7 +117,7 @@ func SplitCustomValue(str string) (rv [][]string) {
 			continue
 		}
 
-		ss := strings.Split(ab, "|")
+		ss := strings.Split(val, "|")
 		rv = append(rv, ss)
 	}
 	return

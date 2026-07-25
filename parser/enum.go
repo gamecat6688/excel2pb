@@ -122,7 +122,11 @@ func (s *EnumParser) ExportProto(filter string) {
 	// 执行模板,输出文件
 	err = tmpl.Execute(f, m)
 	if err != nil {
+		_ = f.Close()
 		slog.Error("tmpl.Execute fail", "error", err)
 		return
+	}
+	if err := f.Close(); err != nil {
+		slog.Error("close proto file fail", "error", err)
 	}
 }

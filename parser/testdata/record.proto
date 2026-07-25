@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package test;
+
+message Child {
+  string name = 1;
+}
+
+message Record {
+  string title = 1;
+  repeated int32 ids = 2;
+  Child child = 3;
+}

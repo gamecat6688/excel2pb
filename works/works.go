@@ -18,11 +18,8 @@ func Go(fn func()) {
 	wg.Add(1)
 
 	go func() {
-		defer RecoverFunc(func() {
-			wg.Done()
-		})
-
-		fn()
+		defer wg.Done()
+		RecoverFunc(fn)
 	}()
 
 }

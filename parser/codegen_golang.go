@@ -62,8 +62,12 @@ func (g *GolangLoaderCodeGenerator) GenCode(root *Parser) bool {
 		slices.Sort(m.Names)
 		err = tmpl.Execute(f, m)
 		if err != nil {
+			_ = f.Close()
 			slog.Error("tmpl.Execute fail", "error", err)
 			continue
+		}
+		if err := f.Close(); err != nil {
+			slog.Error("close code file fail", "error", err)
 		}
 	}
 
@@ -163,8 +167,12 @@ func (g *GolangModuleCodeGenerator) GenCode(root *Parser, sheet *SheetParser) bo
 		}
 		err = tmpl.Execute(f, m)
 		if err != nil {
+			_ = f.Close()
 			slog.Error("tmpl.Execute fail", "error", err)
 			continue
+		}
+		if err := f.Close(); err != nil {
+			slog.Error("close code file fail", "error", err)
 		}
 	}
 
