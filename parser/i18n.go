@@ -84,6 +84,7 @@ func (i *I18nParser) SetData(id string, cn string) {
 		lineData[0] = id
 		lineData[1] = cn
 		i.dataRows = append(i.dataRows, lineData)
+		i.indexes[id] = len(i.dataRows) - 1
 	} else {
 		i.dataRows[index][0] = id
 		i.dataRows[index][1] = cn
@@ -102,7 +103,7 @@ func (i *I18nParser) sortDataRows() {
 		id2 := ss2[2]
 
 		// 先比较首字母
-		if par1 != par1 {
+		if par1 != par2 {
 			return par1 < par2
 		}
 
