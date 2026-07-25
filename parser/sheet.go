@@ -23,7 +23,8 @@ var reTrimTag = regexp.MustCompile(`[\n\t\r ]+`)
 
 // 客户端或服务器
 type Sheet struct {
-	sheetName string
+	sheetName  string
+	sourceFile string
 
 	filter string // c or s
 
@@ -65,15 +66,32 @@ func NewSheetParser(sheetName string) *SheetParser {
 	}
 }
 
+func (s *SheetParser) SetSourceFile(sourceFile string) {
+	s.sourceFile = sourceFile
+	s.logger = slog.Default().With("sheet", s.sheetName, "source_file", sourceFile)
+}
+
+func (s *SheetParser) configLocation(rowIndex int32) string {
+	location := fmt.Sprintf("file=%q sheet=%q", s.sourceFile, s.sheetName)
+	if rowIndex >= 0 {
+		location += fmt.Sprintf(" excel_row=%d", DataRowIndex2ExcelRow(rowIndex))
+	}
+	return location
+}
+
 // getFieldColIndex 获得指定字段名的列索引
 func (s *SheetParser) getFieldColIndex(name string) int32 {
-	return s.headersIndexes[name]
+	colIndex, ok := s.headersIndexes[name]
+	if !ok {
+		panic(fmt.Sprintf("[%s] field %q not found", s.configLocation(-1), name))
+	}
+	return colIndex
 }
 
 // GetFiled 获得指定字段名的列索引
 func (s *SheetParser) GetFiled(colIndex int32) Head {
 	if colIndex < 0 || int(colIndex) >= len(s.headers) {
-		panic(fmt.Sprintf("[%v] field index %v is outside header range 0..%v", s.sheetName, colIndex, len(s.headers)-1))
+		panic(fmt.Sprintf("[%s] field index %v is outside header range 0..%v", s.configLocation(-1), colIndex, len(s.headers)-1))
 	}
 	return s.headers[colIndex]
 }
@@ -166,7 +184,7 @@ func (s *SheetParser) parseHeader(rows [][]string) {
 	s.clearHeaders()
 
 	if len(rows) < HeadCount || len(rows[0]) == 0 {
-		panic(fmt.Sprintf("sheet %v, header is empty", s.sheetName))
+		panic(fmt.Sprintf("[%s] header is empty or has fewer than %d rows", s.configLocation(-1), HeadCount))
 	}
 
 	// 预先分配字段数量
@@ -175,6 +193,9 @@ func (s *SheetParser) parseHeader(rows [][]string) {
 	for i, row := range rows {
 		if !s.isHeader(int32(i)) {
 			break
+		}
+		if len(row) > len(s.headers) {
+			panic(fmt.Sprintf("[%s] header row %d has %d columns, but the field-name row has %d", s.configLocation(-1), i+1, len(row), len(s.headers)))
 		}
 
 		for j, cell := range row {
@@ -209,10 +230,10 @@ func (s *SheetParser) parseData(rows [][]string) {
 // 返回
 func (s *SheetParser) checkFiledValueIsUnique(filedName string) (value string, ok bool) {
 	// 检查指定列的数据，是否存在重复值
-	colIndex := s.getFieldColIndex(filedName)
+	_ = s.getFieldColIndex(filedName)
 	values := make(map[string]bool)
-	for _, row := range s.dataRows {
-		v := row[colIndex]
+	for rowIndex := range s.dataRows {
+		v := s.getFiledValue(filedName, int32(rowIndex))
 		if values[v] {
 			return v, false
 		}
@@ -226,9 +247,9 @@ func (s *SheetParser) checkFiledValueIsUnique(filedName string) (value string, o
 // 可以缓存成map，减少重复计算
 func (s *SheetParser) hasExistFiledValue(filedName string, filedValue string) bool {
 	// 检查指定列的数据，是否存在
-	colIndex := s.getFieldColIndex(filedName)
-	for _, row := range s.dataRows {
-		value := row[colIndex]
+	_ = s.getFieldColIndex(filedName)
+	for rowIndex := range s.dataRows {
+		value := s.getFiledValue(filedName, int32(rowIndex))
 		if value == filedValue {
 			return true
 		}
@@ -273,8 +294,8 @@ func (s *SheetParser) checkCustomFieldCount(fd Head, rowIdx int32, value string,
 		return
 	}
 
-	panic(fmt.Sprintf("[%v.%v] invalid composite value at excel row %v: %v expects %v fields, got %v in %q",
-		s.sheetName, fd.Name(), DataRowIndex2ExcelRow(rowIdx), fd.BaseType(), expected, len(customRow), value))
+	panic(fmt.Sprintf("[%s field=%q] invalid composite value: %v expects %v fields, got %v in %q",
+		s.configLocation(rowIdx), fd.Name(), fd.BaseType(), expected, len(customRow), value))
 }
 
 // checkPrimaryKey 主键唯一性检测
@@ -298,9 +319,8 @@ func (s *SheetParser) checkPrimaryKey(root *Parser) {
 			for _, pk := range pks {
 				names = append(names, pk.Name())
 			}
-			panic(fmt.Sprintf("[%v]check pk fail, duplicate key (%v)=(%v) at excel row %v",
-				s.sheetName, strings.Join(names, ","), strings.Join(parts, ","),
-				DataRowIndex2ExcelRow(int32(rowIndex))))
+			panic(fmt.Sprintf("[%s] duplicate primary key (%v)=(%v)",
+				s.configLocation(int32(rowIndex)), strings.Join(names, ","), strings.Join(parts, ",")))
 		}
 		seen[key] = true
 	}
@@ -312,8 +332,8 @@ func (s *SheetParser) checkUnique(root *Parser) {
 		if head.IsUnique() {
 			value, ok := s.checkFiledValueIsUnique(head.Name())
 			if !ok {
-				panic(fmt.Sprintf("[%v.%v]check unique fail, has same value %v",
-					s.sheetName, head.Name(), value))
+				panic(fmt.Sprintf("[%s field=%q] duplicate unique value %q",
+					s.configLocation(-1), head.Name(), value))
 			}
 		}
 	}
@@ -334,20 +354,19 @@ func (s *SheetParser) checkTags(root *Parser) {
 					// 没有内嵌结构
 
 					// 检测外键的表是否存在
-					if !root.hasSheetParser(fkSheetName) {
-						slog.Error(fmt.Sprintf("[%v.%v]check foreign key fail, sheet not found: %v", s.sheetName, head.Name(), fkSheetName))
+					refSheetParser := root.getSheetParser(fkSheetName)
+					if refSheetParser == nil {
+						s.logger.Error("foreign key target sheet not found", "field", head.Name(), "target_sheet", fkSheetName, "target_field", fkFiledName)
+						continue
 					}
 
 					// 检测外键的字段值是否存在（支持repeated）
-					refSheetParser := root.getSheetParser(fkSheetName)
 					for rowIndex, _ := range s.dataRows {
 						thisValue := s.getFiledValue(head.Name(), int32(rowIndex))
 						values := SplitBaseValue(thisValue)
 						for _, checkValue := range values {
 							if !refSheetParser.hasExistFiledValue(fkFiledName, checkValue) {
-								slog.Error(fmt.Sprintf("[%v.%v]check foreign key fail, ref value is excel row=%v, failValue=%v, value=%v, not found: %v.%v",
-									s.sheetName, head.Name(),
-									DataRowIndex2ExcelRow(int32(rowIndex)), checkValue, thisValue, fkSheetName, fkFiledName))
+								s.logger.Error("foreign key value not found", "field", head.Name(), "excel_row", DataRowIndex2ExcelRow(int32(rowIndex)), "value", checkValue, "cell_value", thisValue, "target_sheet", fkSheetName, "target_field", fkFiledName)
 							}
 						}
 					}
@@ -356,23 +375,23 @@ func (s *SheetParser) checkTags(root *Parser) {
 					// 有内嵌结构
 
 					// 检测外键的表是否存在
-					if !root.hasSheetParser(fkSheetName) {
-						slog.Error(fmt.Sprintf("[%v.%v]check foreign key fail, sheet not found: %v", s.sheetName, head.Name(), fkSheetName))
+					refSheetParser := root.getSheetParser(fkSheetName)
+					customParser := root.getSheetParser(embedSheetName)
+					if refSheetParser == nil || customParser == nil {
+						s.logger.Error("embedded foreign key target sheet not found", "field", head.Name(), "embedded_sheet", embedSheetName, "target_sheet", fkSheetName, "target_field", fkFiledName)
+						continue
 					}
 
 					// 检测外键的字段值是否存在（支持repeated）
-					refSheetParser := root.getSheetParser(fkSheetName)
 					for rowIndex, _ := range s.dataRows {
 						thisValue := s.getFiledValue(head.Name(), int32(rowIndex))
 						values := SplitCustomValue(thisValue)
 						for _, checkMsg := range values {
 							idx := refSheetParser.getFieldColIndex(fkFiledName)
-							s.checkCustomFieldCount(head, int32(rowIndex), thisValue, checkMsg, root.getSheetParser(embedSheetName))
+							s.checkCustomFieldCount(head, int32(rowIndex), thisValue, checkMsg, customParser)
 							checkValue := checkMsg[idx]
 							if !refSheetParser.hasExistFiledValue(fkFiledName, checkValue) {
-								slog.Error(fmt.Sprintf("[%v.%v]check foreign key fail, ref value is excel row=%v, failValue=%v, value=%v, not found: %v.%v",
-									s.sheetName, head.Name(),
-									DataRowIndex2ExcelRow(int32(rowIndex)), checkValue, thisValue, fkSheetName, fkFiledName))
+								s.logger.Error("embedded foreign key value not found", "field", head.Name(), "excel_row", DataRowIndex2ExcelRow(int32(rowIndex)), "value", checkValue, "cell_value", thisValue, "target_sheet", fkSheetName, "target_field", fkFiledName)
 							}
 						}
 					}
@@ -393,6 +412,7 @@ func (s *SheetParser) SplitByFilter(filterName string) *SheetParser {
 		},
 	}
 	ns.sheetName = s.sheetName
+	ns.sourceFile = s.sourceFile
 	ns.filter = filterName
 
 	// 复制过滤后的表头
@@ -521,11 +541,14 @@ func (s *SheetParser) ExportProto(root *Parser) {
 
 	// 创建proto文件
 	outPath := s.getProtoOutPath()
-	os.MkdirAll(outPath, os.ModePerm)
+	if err := os.MkdirAll(outPath, os.ModePerm); err != nil {
+		s.logger.Error("create proto output directory failed", "output_path", outPath, "filter", s.filter, "error", err)
+		return
+	}
 
 	f, err := os.Create(s.getProtoFilePath())
 	if err != nil {
-		slog.Error("create proto file fail", "error", err)
+		s.logger.Error("create proto file failed", "output_path", s.getProtoFilePath(), "filter", s.filter, "error", err)
 		return
 	}
 
@@ -533,11 +556,11 @@ func (s *SheetParser) ExportProto(root *Parser) {
 	err = tmpl.Execute(f, m)
 	if err != nil {
 		_ = f.Close()
-		slog.Error("tmpl.Execute fail", "error", err)
+		s.logger.Error("render proto template failed", "output_path", s.getProtoFilePath(), "filter", s.filter, "error", err)
 		return
 	}
 	if err := f.Close(); err != nil {
-		slog.Error("close proto file fail", "error", err)
+		s.logger.Error("close proto file failed", "output_path", s.getProtoFilePath(), "filter", s.filter, "error", err)
 	}
 }
 
@@ -577,7 +600,7 @@ func (s *SheetParser) ExportData(root *Parser) {
 	protoNames := s.getAllProtoFiles(root)
 	resolver, err := parseProtoFile(protoNames, []string{s.getProtoOutPath()})
 	if err != nil {
-		slog.Error("parseProtoFile fail", "error", err, "filter", s.filter)
+		s.logger.Error("compile generated proto for data export failed", "proto_files", protoNames, "proto_path", s.getProtoOutPath(), "filter", s.filter, "error", err)
 		return
 	}
 
@@ -585,12 +608,12 @@ func (s *SheetParser) ExportData(root *Parser) {
 	configMsgName := fmt.Sprintf("%v.%v", s.getPackageName(), s.sheetName)
 	configMsgType, err := getMessageType(resolver, configMsgName+"Config")
 	if err != nil {
-		slog.Error("getMessageType fail", "error", err, "filter", s.filter)
+		s.logger.Error("resolve config protobuf message failed", "message", configMsgName+"Config", "filter", s.filter, "error", err)
 		return
 	}
 	recordMsgType, err := getMessageType(resolver, configMsgName)
 	if err != nil {
-		slog.Error("getMessageType fail", "error", err, "filter", s.filter)
+		s.logger.Error("resolve record protobuf message failed", "message", configMsgName, "filter", s.filter, "error", err)
 		return
 	}
 
@@ -607,7 +630,7 @@ func (s *SheetParser) ExportData(root *Parser) {
 				subMsgName := fmt.Sprintf("%v.%v", s.getPackageName(), fd.BaseType())
 				subMsgType, err2 := getMessageType(resolver, subMsgName)
 				if err2 != nil {
-					slog.Error("getMessageType fail", "error", err2, "filter", s.filter)
+					s.logger.Error("resolve nested protobuf message failed", "field", fd.Name(), "message", subMsgName, "excel_row", DataRowIndex2ExcelRow(int32(rowIdx)), "filter", s.filter, "error", err2)
 					return
 				}
 
@@ -648,16 +671,21 @@ func (s *SheetParser) ExportData(root *Parser) {
 	// 4. 序列化
 	data, err := proto.Marshal(configMsg.(proto.Message))
 	if err != nil {
-		panic(err)
+		panic(fmt.Sprintf("[%s] marshal protobuf data failed: %v", s.configLocation(-1), err))
 	}
 
 	// make dirs
 	outPath := s.getDataOutPath()
-	os.MkdirAll(outPath, os.ModePerm)
+	if err := os.MkdirAll(outPath, os.ModePerm); err != nil {
+		s.logger.Error("create data output directory failed", "output_path", outPath, "filter", s.filter, "error", err)
+		return
+	}
 
 	// write dataRows file
 	dataFilePath := s.getDataFilePath()
-	os.WriteFile(dataFilePath, data, os.ModePerm)
+	if err := os.WriteFile(dataFilePath, data, os.ModePerm); err != nil {
+		s.logger.Error("write protobuf data failed", "output_path", dataFilePath, "filter", s.filter, "error", err)
+	}
 }
 
 func (s *SheetParser) ExportCode(root *Parser) {
@@ -725,7 +753,7 @@ func (s *SheetParser) TypeNameToValue(root *Parser, fd Head, rowIdx int32, value
 		timeOfZone := DataTimeToRFC3339(value, config.Cfg.TimeZone)
 		t, err := time.Parse(time.RFC3339, timeOfZone)
 		if err != nil {
-			panic(fmt.Sprintf("[%v.%v]parseFromFile time fail, val:%v, time:%v", sheetName, headName, value, timeOfZone))
+			panic(fmt.Sprintf("[%s field=%q] parse timestamp failed: value=%q RFC3339=%q error=%v", s.configLocation(rowIdx), headName, value, timeOfZone, err))
 		}
 		return protoreflect.ValueOfInt64(t.Unix())
 	case I18nName:
@@ -745,7 +773,7 @@ func (s *SheetParser) TypeNameToValue(root *Parser, fd Head, rowIdx int32, value
 				return protoreflect.ValueOfEnum(protoreflect.EnumNumber(enumValue))
 			}
 		} else {
-			panic(fmt.Sprintf("[%v.%v]not support type %v", sheetName, headName, typeName))
+			panic(fmt.Sprintf("[%s field=%q] unsupported type %q", s.configLocation(rowIdx), headName, typeName))
 		}
 	}
 

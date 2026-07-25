@@ -69,7 +69,7 @@ func TestValidationTypeConversionAndDependencies(t *testing.T) {
 	unsupported := Head{info: [HeadCount]string{HeadName: "Bad", HeadType: "unknown"}}
 	func() {
 		defer func() {
-			if recovered := recover(); recovered == nil || !strings.Contains(recovered.(string), "not support type unknown") {
+			if recovered := recover(); recovered == nil || !strings.Contains(recovered.(string), "unsupported type \"unknown\"") {
 				t.Fatalf("unexpected unknown-type panic: %v", recovered)
 			}
 		}()
@@ -82,9 +82,18 @@ func TestUniqueValidationReportsDuplicate(t *testing.T) {
 		{"Name"}, {"unique string"}, {"cs"}, {""}, {"same"}, {"same"},
 	})
 	defer func() {
-		if recovered := recover(); recovered == nil || !strings.Contains(recovered.(string), "Item.Name") {
+		if recovered := recover(); recovered == nil || !strings.Contains(recovered.(string), "sheet=\"Item\"") || !strings.Contains(recovered.(string), "field=\"Name\"") {
 			t.Fatalf("unexpected uniqueness error: %v", recovered)
 		}
 	}()
 	s.checkUnique(NewParser())
+}
+
+func TestMissingForeignKeyTargetDoesNotCrashValidation(t *testing.T) {
+	s := makeSheet("Item", [][]string{
+		{"RefID"}, {"int32"}, {"cs"}, {""}, {"1"},
+	})
+	s.SetSourceFile("assets/xls/item.xlsx")
+	s.headers[0].tags = []HeadTag{"fk:Missing.ID"}
+	s.checkTags(NewParser())
 }

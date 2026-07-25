@@ -34,8 +34,11 @@ func (p *Parser) ParseExcels() {
 	// 读取所有文件夹(包含子文件夹)下的excel文件，排除~开头的临时文件
 	matches, err := doublestar.FilepathGlob(fmt.Sprintf("%v/**/[!~]*.xlsx", config.Cfg.ExcelDir))
 	if err != nil {
-		slog.Error("ParseExcels fail", "error", err)
+		slog.Error("find Excel workbooks failed", "excel_dir", config.Cfg.ExcelDir, "error", err)
 		return
+	}
+	if len(matches) == 0 {
+		slog.Warn("no Excel workbooks found", "excel_dir", config.Cfg.ExcelDir)
 	}
 
 	// 并发解析excel
@@ -53,7 +56,7 @@ func (p *Parser) ParseExcels() {
 func (p *Parser) parseFromFile(excelFile string) {
 	f, err := excelize.OpenFile(excelFile)
 	if err != nil {
-		slog.Error("open file fail", "error", err)
+		slog.Error("open Excel workbook failed", "file", excelFile, "error", err)
 		return
 	}
 	defer f.Close()
@@ -67,14 +70,15 @@ func (p *Parser) parseFromFile(excelFile string) {
 		if strings.HasSuffix(sheetName, "Enum") {
 			// 枚举表
 			if p.hasEnumParser(sheetName) {
-				slog.Error("sheet already exist", "sheetName", sheetName)
+				slog.Error("duplicate enum sheet name", "file", excelFile, "sheet", sheetName)
 				return
 			}
 
 			enumName := SplitEnumName(sheetName)
 			ps := NewEnumParser(sheetName)
+			ps.SetSourceFile(excelFile)
 			if !ps.Parse(f) {
-				slog.Error("parseFromFile sheet fail", "sheetName", sheetName)
+				slog.Error("parse enum sheet failed", "file", excelFile, "sheet", sheetName)
 				return
 			}
 
@@ -84,12 +88,17 @@ func (p *Parser) parseFromFile(excelFile string) {
 		} else {
 			// 数据表
 			if p.hasSheetParser(sheetName) {
-				slog.Error("sheet already exist", "sheetName", sheetName)
+				slog.Error("duplicate data sheet name", "file", excelFile, "sheet", sheetName)
 				return
 			}
 
 			ps := NewSheetParser(sheetName)
-			rows, _ := f.GetRows(sheetName)
+			ps.SetSourceFile(excelFile)
+			rows, err := f.GetRows(sheetName)
+			if err != nil {
+				slog.Error("read data sheet rows failed", "file", excelFile, "sheet", sheetName, "error", err)
+				continue
+			}
 			ps.ParseRows(rows)
 			ps.ParseHeadTags(f)
 
@@ -110,23 +119,30 @@ func (p *Parser) MergeI18n() {
 	}
 
 	slog.Info("merge i18n start")
+	i18nPath := p.GetI18nFilePath()
 
 	//defer TimeCost("MergeI18n")()
 
 	var i18n *I18nParser
-	f, err := excelize.OpenFile(p.GetI18nFilePath())
+	f, err := excelize.OpenFile(i18nPath)
 	if err == nil {
 		defer f.Close()
 
 		// 读取已存在的i18n文件
 		ps := NewSheetParser(I18nSheetName)
-		rows, _ := f.GetRows(I18nSheetName)
+		ps.SetSourceFile(i18nPath)
+		rows, err := f.GetRows(I18nSheetName)
+		if err != nil {
+			slog.Error("read I18N sheet rows failed", "file", i18nPath, "sheet", I18nSheetName, "error", err)
+			return
+		}
 		ps.ParseRows(rows)
 
 		i18n = NewI18nParser(ps)
 	} else {
 		// 创建新的i18n文件
 		i18n = NewI18nParser(nil)
+		i18n.SetSourceFile(i18nPath)
 	}
 
 	// 合并新的多语言数据
@@ -134,7 +150,10 @@ func (p *Parser) MergeI18n() {
 		i18n.MergeSheet(v)
 	}
 
-	i18n.WriteToExcel(p.GetI18nFilePath())
+	if !i18n.WriteToExcel(i18nPath) {
+		slog.Error("write merged I18N workbook failed", "file", i18nPath)
+		return
+	}
 
 	p.Lock()
 	p.sheets[I18nSheetName] = i18n.SheetParser
@@ -184,7 +203,7 @@ func (p *Parser) getEnumParser(sheetName string) *EnumParser {
 func (p *Parser) checks() {
 	for _, sheet := range p.sheets {
 		works.Go(func() {
-			slog.Info("check excels", "sheetName", sheet.sheetName)
+			slog.Info("check Excel sheet", "sheet", sheet.sheetName, "source_file", sheet.sourceFile)
 			sheet.checks(p)
 		})
 	}
@@ -195,7 +214,7 @@ func (p *Parser) exportProto() {
 	for _, v := range p.enums {
 		for _, f := range AllFilters {
 			works.Go(func() {
-				slog.Info("export enum proto", "sheetName", v.sheetName, "filter", f)
+				slog.Info("export enum proto", "sheet", v.sheetName, "source_file", v.sourceFile, "filter", f)
 				v.ExportProto(f)
 			})
 		}
@@ -204,7 +223,7 @@ func (p *Parser) exportProto() {
 	for _, v := range p.sheets {
 		for _, f := range AllFilters {
 			works.Go(func() {
-				slog.Info("export message proto", "sheetName", v.sheetName, "filter", f)
+				slog.Info("export message proto", "sheet", v.sheetName, "source_file", v.sourceFile, "filter", f)
 				ns := v.SplitByFilter(f)
 				ns.ExportProto(p)
 			})
@@ -223,11 +242,14 @@ func (p *Parser) exportPb() {
 		pbOutPath := cfg.PbPath
 
 		// make dirs
-		os.MkdirAll(pbOutPath, os.ModePerm)
+		if err := os.MkdirAll(pbOutPath, os.ModePerm); err != nil {
+			slog.Error("create protobuf code output directory failed", "filter", filter, "output_path", pbOutPath, "error", err)
+			continue
+		}
 
 		sss, err := filepath.Glob(fmt.Sprintf("%v/*.proto", protoOutPath))
 		if err != nil {
-			slog.Error("export pb fail", "error", err)
+			slog.Error("find generated proto files failed", "filter", filter, "proto_path", protoOutPath, "error", err)
 			return
 		}
 
@@ -247,13 +269,16 @@ func (p *Parser) exportPb() {
 			case "cpp":
 				argOut = fmt.Sprintf("--cpp_out=%v", pbOutPath)
 			}
+			if argOut == "" {
+				slog.Error("unsupported protobuf code language", "filter", filter, "code_language", cfg.CodeLanguage, "proto_file", filename)
+				continue
+			}
 
 			works.Go(func() {
 				cmd := exec.Command("protoc", argInclude, argOut, filename)
-				err = cmd.Run()
+				output, err := cmd.CombinedOutput()
 				if err != nil {
-					slog.Error("protoc failed", "error", err, "filename", filename)
-					//log.Fatalf("protoc failed: %v", err)
+					slog.Error("protoc failed", "filter", filter, "code_language", cfg.CodeLanguage, "proto_file", filename, "proto_path", protoOutPath, "output_path", pbOutPath, "error", err, "output", strings.TrimSpace(string(output)))
 				}
 			})
 		}
@@ -266,7 +291,7 @@ func (p *Parser) exportData() {
 	for _, v := range p.sheets {
 		for _, f := range AllFilters {
 			works.Go(func() {
-				slog.Info("export bin file", "sheetName", v.sheetName, "filter", f)
+				slog.Info("export binary data", "sheet", v.sheetName, "source_file", v.sourceFile, "filter", f)
 				ns := v.SplitByFilter(f)
 				ns.ExportData(p)
 			})

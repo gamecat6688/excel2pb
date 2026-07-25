@@ -50,7 +50,7 @@ func TestCompositePrimaryKeyValidation(t *testing.T) {
 
 	defer func() {
 		recovered := recover()
-		if recovered == nil || !strings.Contains(recovered.(string), "duplicate key (ItemID,Level)=(1,1)") {
+		if recovered == nil || !strings.Contains(recovered.(string), "duplicate primary key (ItemID,Level)=(1,1)") || !strings.Contains(recovered.(string), "excel_row=6") {
 			t.Fatalf("unexpected duplicate primary key error: %v", recovered)
 		}
 	}()

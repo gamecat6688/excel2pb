@@ -48,8 +48,25 @@ func TestEnumParser(t *testing.T) {
 		t.Fatal(err)
 	}
 	enum := NewEnumParser("Quality_Enum")
+	enum.SetSourceFile("assets/xls/quality.xlsx")
 	if !enum.Parse(f) || enum.name != "Quality" || len(enum.enums) != 2 || enum.getEnumValue("Rare") != 2 {
 		t.Fatalf("unexpected enum parser result: %#v", enum)
+	}
+	if enum.sourceFile != "assets/xls/quality.xlsx" {
+		t.Fatalf("enum source file = %q", enum.sourceFile)
+	}
+
+	if _, err := f.NewSheet("Broken_Enum"); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.SetSheetRow("Broken_Enum", "A1", &[]interface{}{"Name", "Value"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.SetSheetRow("Broken_Enum", "A2", &[]interface{}{"OnlyName"}); err != nil {
+		t.Fatal(err)
+	}
+	if NewEnumParser("Broken_Enum").Parse(f) {
+		t.Fatal("enum row without a value must be rejected")
 	}
 
 }
