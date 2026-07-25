@@ -25,6 +25,7 @@ func TestParseHeadTagsSkipsEmptyCommentParagraph(t *testing.T) {
 
 func TestCheckCustomFieldCountReportsConfigLocation(t *testing.T) {
 	parser := NewSheetParser("DropPool")
+	parser.SetSourceFile("assets/xls/drop_pool.xlsx")
 	child := NewSheetParser("DropEntry")
 	child.ParseRows([][]string{{"ItemId", "Weight", "MinQuantity", "MaxQuantity"}, {"int32", "int32", "int32", "int32"}, {"cs", "cs", "cs", "cs"}, {"", "", "", ""}})
 
@@ -34,7 +35,7 @@ func TestCheckCustomFieldCountReportsConfigLocation(t *testing.T) {
 			t.Fatal("expected invalid composite value panic")
 		}
 		message := recovered.(string)
-		for _, fragment := range []string{"DropPool.Entries", "excel row 5", "DropEntry expects 4 fields", "got 2"} {
+		for _, fragment := range []string{"file=\"assets/xls/drop_pool.xlsx\"", "sheet=\"DropPool\"", "excel_row=5", "field=\"Entries\"", "DropEntry expects 4 fields", "got 2"} {
 			if !strings.Contains(message, fragment) {
 				t.Fatalf("panic %q does not contain %q", message, fragment)
 			}

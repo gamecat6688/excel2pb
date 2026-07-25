@@ -21,9 +21,10 @@ type EnumInfo struct {
 }
 
 type EnumParser struct {
-	sheetName string // 工作表名
-	name      string // 枚举包名
-	enums     []EnumInfo
+	sourceFile string
+	sheetName  string // 工作表名
+	name       string // 枚举包名
+	enums      []EnumInfo
 }
 
 func NewEnumParser(sheetName string) *EnumParser {
@@ -34,8 +35,16 @@ func NewEnumParser(sheetName string) *EnumParser {
 	}
 }
 
+func (s *EnumParser) SetSourceFile(sourceFile string) {
+	s.sourceFile = sourceFile
+}
+
 func (s *EnumParser) Parse(f *excelize.File) bool {
-	rows, _ := f.GetRows(s.sheetName)
+	rows, err := f.GetRows(s.sheetName)
+	if err != nil {
+		slog.Error("read enum sheet rows failed", "file", s.sourceFile, "sheet", s.sheetName, "error", err)
+		return false
+	}
 	for i, row := range rows {
 		if i == 0 {
 			// 跳过表头
@@ -45,6 +54,10 @@ func (s *EnumParser) Parse(f *excelize.File) bool {
 		if len(row) == 0 {
 			// 跳过空行
 			continue
+		}
+		if len(row) < 2 {
+			slog.Error("invalid enum row", "file", s.sourceFile, "sheet", s.sheetName, "excel_row", i+1, "column_count", len(row), "expected_columns", 2)
+			return false
 		}
 
 		enum := EnumInfo{
@@ -71,7 +84,7 @@ func (s *EnumParser) getEnumValue(enumName string) int32 {
 		}
 	}
 
-	panic(fmt.Sprintf("[%v.%v]not found enumName support type %v", s.sheetName, s.name, enumName))
+	panic(fmt.Sprintf("[file=%q sheet=%q enum=%q] enum value %q not found", s.sourceFile, s.sheetName, s.name, enumName))
 	return 0
 }
 
@@ -111,11 +124,14 @@ func (s *EnumParser) ExportProto(filter string) {
 
 	// 创建proto文件
 	outPath := s.getProtoOutPath(filter)
-	os.MkdirAll(outPath, os.ModePerm)
+	if err := os.MkdirAll(outPath, os.ModePerm); err != nil {
+		slog.Error("create enum proto output directory failed", "file", s.sourceFile, "sheet", s.sheetName, "filter", filter, "output_path", outPath, "error", err)
+		return
+	}
 
 	f, err := os.Create(s.getProtoFilePath(filter))
 	if err != nil {
-		slog.Error("create proto file fail", "error", err)
+		slog.Error("create enum proto file failed", "file", s.sourceFile, "sheet", s.sheetName, "filter", filter, "output_path", s.getProtoFilePath(filter), "error", err)
 		return
 	}
 
@@ -123,10 +139,10 @@ func (s *EnumParser) ExportProto(filter string) {
 	err = tmpl.Execute(f, m)
 	if err != nil {
 		_ = f.Close()
-		slog.Error("tmpl.Execute fail", "error", err)
+		slog.Error("render enum proto template failed", "file", s.sourceFile, "sheet", s.sheetName, "filter", filter, "output_path", s.getProtoFilePath(filter), "error", err)
 		return
 	}
 	if err := f.Close(); err != nil {
-		slog.Error("close proto file fail", "error", err)
+		slog.Error("close enum proto file failed", "file", s.sourceFile, "sheet", s.sheetName, "filter", filter, "output_path", s.getProtoFilePath(filter), "error", err)
 	}
 }
