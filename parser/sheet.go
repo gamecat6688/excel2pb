@@ -72,6 +72,9 @@ func (s *SheetParser) getFieldColIndex(name string) int32 {
 
 // GetFiled 获得指定字段名的列索引
 func (s *SheetParser) GetFiled(colIndex int32) Head {
+	if colIndex < 0 || int(colIndex) >= len(s.headers) {
+		panic(fmt.Sprintf("[%v] field index %v is outside header range 0..%v", s.sheetName, colIndex, len(s.headers)-1))
+	}
 	return s.headers[colIndex]
 }
 
@@ -99,17 +102,41 @@ func (s *SheetParser) ParseRows(rows [][]string) {
 }
 
 func (s *SheetParser) ParseHeadTags(f *excelize.File) {
-	comments, _ := f.GetComments(s.sheetName)
+	comments, err := f.GetComments(s.sheetName)
+	if err != nil {
+		s.logger.Warn("read sheet comments failed", "error", err)
+		return
+	}
 	for _, v := range comments {
-		col, row, _ := excelize.CellNameToCoordinates(v.Cell)
+		col, row, err := excelize.CellNameToCoordinates(v.Cell)
+		if err != nil {
+			s.logger.Warn("skip comment with invalid cell reference", "cell", v.Cell, "error", err)
+			continue
+		}
 		if row != 1 {
 			// 出需要处理第一行的批注
 			continue
 		}
 
 		// 处理批注
-		txtTag := v.Paragraph[0].Text
+		if col < 1 || col > len(s.headers) {
+			s.logger.Warn("skip comment outside sheet header", "cell", v.Cell)
+			continue
+		}
+
+		// Comments written by other Excel libraries may have no rich-text runs.
+		txtTag := v.Text
+		if txtTag == "" {
+			var builder strings.Builder
+			for _, paragraph := range v.Paragraph {
+				builder.WriteString(paragraph.Text)
+			}
+			txtTag = builder.String()
+		}
 		txtTag = reTrimTag.ReplaceAllString(txtTag, "")
+		if txtTag == "" {
+			continue
+		}
 
 		// 处理空格
 		var tags []HeadTag
@@ -138,7 +165,7 @@ func (s *SheetParser) clearHeaders() {
 func (s *SheetParser) parseHeader(rows [][]string) {
 	s.clearHeaders()
 
-	if len(rows[0]) == 0 {
+	if len(rows) < HeadCount || len(rows[0]) == 0 {
 		panic(fmt.Sprintf("sheet %v, header is empty", s.sheetName))
 	}
 
@@ -220,7 +247,34 @@ func (s *SheetParser) getFiledValue(filedName string, rowIndex int32) string {
 func (s *SheetParser) checks(root *Parser) {
 	s.checkPrimaryKey(root)
 	s.checkUnique(root)
+	s.checkCustomMessageValues(root)
 	s.checkTags(root)
+}
+
+func (s *SheetParser) checkCustomMessageValues(root *Parser) {
+	for _, head := range s.headers {
+		if !head.IsCustomMessage(root) {
+			continue
+		}
+
+		customParser := root.getSheetParser(head.BaseType())
+		for rowIndex := range s.dataRows {
+			value := s.getFiledValue(head.Name(), int32(rowIndex))
+			for _, customRow := range SplitCustomValue(value) {
+				s.checkCustomFieldCount(head, int32(rowIndex), value, customRow, customParser)
+			}
+		}
+	}
+}
+
+func (s *SheetParser) checkCustomFieldCount(fd Head, rowIdx int32, value string, customRow []string, customParser *SheetParser) {
+	expected := len(customParser.headers)
+	if len(customRow) == expected {
+		return
+	}
+
+	panic(fmt.Sprintf("[%v.%v] invalid composite value at excel row %v: %v expects %v fields, got %v in %q",
+		s.sheetName, fd.Name(), DataRowIndex2ExcelRow(rowIdx), fd.BaseType(), expected, len(customRow), value))
 }
 
 // checkPrimaryKey 主键唯一性检测
@@ -313,6 +367,7 @@ func (s *SheetParser) checkTags(root *Parser) {
 						values := SplitCustomValue(thisValue)
 						for _, checkMsg := range values {
 							idx := refSheetParser.getFieldColIndex(fkFiledName)
+							s.checkCustomFieldCount(head, int32(rowIndex), thisValue, checkMsg, root.getSheetParser(embedSheetName))
 							checkValue := checkMsg[idx]
 							if !refSheetParser.hasExistFiledValue(fkFiledName, checkValue) {
 								slog.Error(fmt.Sprintf("[%v.%v]check foreign key fail, ref value is excel row=%v, failValue=%v, value=%v, not found: %v.%v",
@@ -631,6 +686,7 @@ func (s *SheetParser) procCustomProtoType(root *Parser, msgType protoreflect.Mes
 	// 构造多个子结构
 	customRows := SplitCustomValue(value)
 	for _, customRow := range customRows {
+		s.checkCustomFieldCount(fd, rowIdx, value, customRow, customParser)
 		customMsg := msgType.New()
 		for idx, subValue := range customRow {
 			subFd := customParser.GetFiled(int32(idx))
