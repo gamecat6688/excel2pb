@@ -74,8 +74,15 @@ type CodeModuleModel struct {
 	Name     string
 	FullName string
 
+	// ProtoScriptPath Godot 模板使用的 protobuf GDScript 相对资源路径。
+	ProtoScriptPath string
+
+	// DataFilePath Godot 模板使用的二进制数据相对资源路径。
+	DataFilePath string
+
 	// KeyType 单主键时为主键类型；多主键时为组合key类型
-	// (golang: 生成的key结构体名; csharp: ValueTuple 如 "(int, long)")
+	// (golang: 生成的key结构体名; csharp: ValueTuple 如 "(int, long)";
+	// godot: 多主键使用 Array)
 	KeyType string
 
 	// KeyName 第一个主键的字段名，单主键模板使用

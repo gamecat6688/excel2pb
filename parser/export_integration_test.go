@@ -24,14 +24,65 @@ func configureTestExports(t *testing.T) string {
 		TplCodePaths: map[string]string{
 			"golang": filepath.Join(dir, "templates", "golang") + string(filepath.Separator),
 			"csharp": filepath.Join(dir, "templates", "csharp") + string(filepath.Separator),
+			"godot":  filepath.Join("..", "assets", "template", "godot") + string(filepath.Separator),
 		},
 		CodeOutPaths: map[string]string{
 			"golang": filepath.Join(dir, "code", "golang"),
 			"csharp": filepath.Join(dir, "code", "csharp"),
+			"godot":  filepath.Join(dir, "code", "godot"),
 		},
 	}
 	t.Cleanup(func() { config.Cfg = previous })
 	return dir
+}
+
+func TestGodotCodeGeneration(t *testing.T) {
+	dir := configureTestExports(t)
+	client := config.Cfg.Outs["Client"]
+	client.CodeLanguage = "godot"
+	config.Cfg.Outs["Client"] = client
+
+	root := NewParser()
+	attr := makeSheet("Attr", [][]string{
+		{"RaceID", "Type", "Value"},
+		{"pk int32", "pk string", "int64"},
+		{"c", "c", "c"},
+		{"race", "type", "value"},
+		{"1", "Attack", "100"},
+	})
+	root.sheets[attr.sheetName] = attr
+
+	root.exportCode()
+
+	modulePath := filepath.Join(config.Cfg.CodeOutPaths["godot"], "AttrModel.gd")
+	module, err := os.ReadFile(modulePath)
+	if err != nil {
+		t.Fatalf("read generated Godot module: %v", err)
+	}
+	output := string(module)
+	for _, want := range []string{
+		"class_name AttrModel",
+		"const Proto = preload(\"../../pb/client/Attr.proto.gd\")",
+		"const DEFAULT_DATA_FILE := \"../../data/client/Attr.bytes\"",
+		"rows[[row.RaceID, row.Type]] = row",
+		"static func make_key(RaceID: int, Type: String) -> Array:",
+	} {
+		if !strings.Contains(output, want) {
+			t.Errorf("Godot module missing %q:\n%s", want, output)
+		}
+	}
+
+	loader, err := os.ReadFile(filepath.Join(config.Cfg.CodeOutPaths["godot"], "game_data.gd"))
+	if err != nil {
+		t.Fatalf("read generated Godot loader: %v", err)
+	}
+	if !strings.Contains(string(loader), "if not _load_model(\"Attr\", AttrModel.new()):") {
+		t.Fatalf("unexpected Godot loader:\n%s", loader)
+	}
+
+	if arg, ok := protobufOutArg("godot", filepath.Join(dir, "pb", "client")); !ok || !strings.HasPrefix(arg, "--gdscript_out=") {
+		t.Fatalf("unexpected Godot protoc argument: %q, %v", arg, ok)
+	}
 }
 
 func TestExportPipelineWithoutProtoc(t *testing.T) {

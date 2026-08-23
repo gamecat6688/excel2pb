@@ -257,19 +257,8 @@ func (p *Parser) exportPb() {
 			slog.Info("export pb file", "filename", filename)
 
 			argInclude := fmt.Sprintf("--proto_path=%v", protoOutPath)
-			argOut := ""
-
-			switch cfg.CodeLanguage {
-			case "golang":
-				argOut = fmt.Sprintf("--go_out=%v", pbOutPath)
-			case "csharp":
-				argOut = fmt.Sprintf("--csharp_out=%v", pbOutPath)
-			case "java":
-				argOut = fmt.Sprintf("--java_out=%v", pbOutPath)
-			case "cpp":
-				argOut = fmt.Sprintf("--cpp_out=%v", pbOutPath)
-			}
-			if argOut == "" {
+			argOut, supported := protobufOutArg(cfg.CodeLanguage, pbOutPath)
+			if !supported {
 				slog.Error("unsupported protobuf code language", "filter", filter, "code_language", cfg.CodeLanguage, "proto_file", filename)
 				continue
 			}
@@ -285,6 +274,21 @@ func (p *Parser) exportPb() {
 	}
 
 	works.Wait()
+}
+
+func protobufOutArg(codeLanguage, outputPath string) (string, bool) {
+	flags := map[string]string{
+		"golang": "go",
+		"csharp": "csharp",
+		"godot":  "gdscript",
+		"java":   "java",
+		"cpp":    "cpp",
+	}
+	flag, ok := flags[codeLanguage]
+	if !ok {
+		return "", false
+	}
+	return fmt.Sprintf("--%s_out=%v", flag, outputPath), true
 }
 
 func (p *Parser) exportData() {
@@ -320,6 +324,11 @@ func (p *Parser) exportLoadCode() {
 		case "csharp":
 			moduleCode := NewCsharpLoaderCode(tplCodePath, codeOutPath)
 			moduleCode.GenCode(p)
+		case "godot":
+			moduleCode := NewGodotLoaderCode(tplCodePath, codeOutPath)
+			moduleCode.GenCode(p)
+		default:
+			slog.Error("unsupported load code language", "filter", f, "code_language", cfg.CodeLanguage)
 		}
 	}
 }

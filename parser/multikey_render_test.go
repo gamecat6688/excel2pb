@@ -90,3 +90,49 @@ func TestSingleKeyGolangTemplateUnchanged(t *testing.T) {
 		t.Errorf("single-key should NOT emit composite key struct:\n%s", out)
 	}
 }
+
+func TestMultiKeyGodotTemplate(t *testing.T) {
+	m := &CodeModuleModel{
+		Name:            "Attr",
+		KeyType:         "Array",
+		KeyName:         "RaceID",
+		MultiKey:        true,
+		ProtoScriptPath: "../../pb/Attr.proto.gd",
+		DataFilePath:    "../../data/Attr.bytes",
+		Keys: []KeyField{
+			{Type: "int", Name: "RaceID"},
+			{Type: "String", Name: "Type"},
+		},
+	}
+	out := renderTpl(t, "../assets/template/godot/{Name}Model.gd", m)
+
+	for _, want := range []string{
+		"const Proto = preload(\"../../pb/Attr.proto.gd\")",
+		"for row in config.Records():",
+		"rows[[row.RaceID, row.Type]] = row",
+		"static func make_key(RaceID: int, Type: String) -> Array:",
+		"func get_row(key: Array):",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("Godot multi-key output missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestSingleKeyGodotTemplate(t *testing.T) {
+	m := &CodeModuleModel{
+		Name:            "Item",
+		KeyType:         "int",
+		KeyName:         "ID",
+		ProtoScriptPath: "../../pb/Item.proto.gd",
+		DataFilePath:    "../../data/Item.bytes",
+		Keys:            []KeyField{{Type: "int", Name: "ID"}},
+	}
+	out := renderTpl(t, "../assets/template/godot/{Name}Model.gd", m)
+	if !strings.Contains(out, "rows[row.ID] = row") || !strings.Contains(out, "func get_row(key: int):") {
+		t.Errorf("unexpected single-key Godot output:\n%s", out)
+	}
+	if strings.Contains(out, "static func make_key") {
+		t.Errorf("single-key Godot output must not emit make_key:\n%s", out)
+	}
+}

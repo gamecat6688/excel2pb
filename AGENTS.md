@@ -42,9 +42,9 @@ go test ./parser/
 
 - 启用 `EnableI18n` 时，`i18n` 字段的源文本会合并到 `I18N.xlsx`；二进制中写入 `Sheet_Field_主键值` 的 key，而不是原文。
 - i18n 表必须有稳定主键；多个主键以 `_` 拼接。不要把 i18n 字段自身设为主键。
-- `CodeLanguage` 目前支持 `golang`、`csharp`。模板位于 `assets/template/<lang>/`，均使用 Go 的 `text/template`。
+- `CodeLanguage` 支持 `golang`、`csharp`、`godot`（Godot 4 / GDScript）。模板位于 `assets/template/<lang>/`，均使用 Go 的 `text/template`。
 - 不带 `{`/`}` 的模板是每种语言执行一次的 Loader；带 `{name}` 或 `{Name}` 的模板按 sheet 执行的 Module。Module 需要主键。
-- 单主键保持旧版 map 输出；多主键 Go 使用 `<表名>Key` 结构体，C# 使用 `ValueTuple`。
+- 单主键保持旧版 map 输出；多主键 Go 使用 `<表名>Key` 结构体，C# 使用 `ValueTuple`，Godot 使用 `Array` 键并生成 `make_key()`。
 
 ## 配置表修改
 

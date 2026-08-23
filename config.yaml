@@ -24,11 +24,13 @@ Outs:
 TplCodePaths:
   golang: assets/template/golang/
   csharp: assets/template/csharp/
+  godot: assets/template/godot/
   cpp: assets/template/cpp/
   java: assets/template/java/
 
 CodeOutPaths:
   golang: assets/out_code/golang/
   csharp: assets/out_code/csharp/
+  godot: assets/out_code/godot/
   cpp:    assets/out_code/cpp/
   java:   assets/out_code/java/
