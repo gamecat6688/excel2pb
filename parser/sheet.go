@@ -699,6 +699,11 @@ func (s *SheetParser) ExportCode(root *Parser) {
 	case "csharp":
 		moduleCode := NewCsharpModuleCode(tplCodePath, codeOutPath)
 		moduleCode.GenCode(root, s)
+	case "godot":
+		moduleCode := NewGodotModuleCode(tplCodePath, codeOutPath)
+		moduleCode.GenCode(root, s)
+	default:
+		s.logger.Error("unsupported module code language", "filter", s.filter, "code_language", cfg.CodeLanguage)
 	}
 }
 

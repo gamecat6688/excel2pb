@@ -8,6 +8,7 @@
 
 - 安装 [protoc](https://github.com/protocolbuffers/protobuf) 并加入 PATH。
 - 各语言的 codegen 插件需自行安装，例如 golang 导出需要 `protoc-gen-go`。
+- Godot / GDScript 导出需要安装 [protoc-gen-gdscript-simple](https://github.com/lixi1983/protoc-gen-gdscript-simple)，确保可执行文件名为 `protoc-gen-gdscript` 并已加入 PATH；同时将该项目的 `addons/protobuf` 复制到 Godot 4 项目的 `addons/protobuf`。
 
 ## 构建与运行
 
@@ -17,6 +18,46 @@ go build -o excel2pb.exe main.go     # 或运行 build_windows.bat / build_all.b
 ```
 
 主要配置项在 `config.yaml`（缺省时回退到内置默认值）：`ExcelDir` 输入目录、`TimeZone` 时区、`EnableI18n` 是否导出多语言、`LogLevel` 日志级别、`MaxProcess` 并发数，以及 `Outs` 中客户端 / 服务器各自的输出路径、包名和目标语言。
+
+## Godot 4 / GDScript
+
+将目标的 `CodeLanguage` 设为 `godot` 即可生成：
+
+- `PbPath`：`protoc-gen-gdscript` 生成的 `*.proto.gd` protobuf 类型代码。
+- `DataPath`：Excel 数据对应的 protobuf 二进制文件。
+- `CodeOutPaths.godot`：每张表的 `*Model.gd` 与汇总入口 `game_data.gd`。
+
+示例：
+
+```yaml
+Outs:
+  Client:
+    ProtoPath: game/protobuf/proto/
+    PbPath: game/protobuf/generated/
+    DataPath: game/config/data/
+    DataExt: ".bytes"
+    PackageName: "pb"
+    CodeLanguage: "godot"
+
+TplCodePaths:
+  godot: assets/template/godot/
+
+CodeOutPaths:
+  godot: game/config/generated/
+```
+
+`PbPath`、`DataPath` 和 `CodeOutPaths.godot` 应位于同一个 Godot 项目中；生成器会在脚本中写入它们之间的相对路径。Godot 导出项目时，还需在非资源导出过滤器中包含 `*.bytes`（或你配置的 `DataExt`），确保二进制配置被打入 PCK。
+
+使用方式：
+
+```gdscript
+var game_data := GameData.new()
+if game_data.load_all():
+    var item_model = game_data.get_model("Item")
+    var item = item_model.get_row(1001)
+```
+
+复合主键使用模型生成的 `make_key()`：`attr_model.get_row(AttrModel.make_key(race_id, type))`。
 
 ## 工作簿与 Sheet 命名
 

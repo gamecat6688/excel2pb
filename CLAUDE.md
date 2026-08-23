@@ -51,7 +51,7 @@ go build -o excel2pb.exe main.go     # 或运行 build_windows.bat / build_all.b
 
 ## 新增 codegen 语言
 
-`ExportCode` / `exportLoadCode` 根据 `CodeLanguage` 分支（目前 `golang`、`csharp`；见 `parser/codegen_golang.go`、`codegen_csharp.go`）。两类生成器：
+`ExportCode` / `exportLoadCode` 根据 `CodeLanguage` 分支（支持 `golang`、`csharp`、`godot`；见 `parser/codegen_golang.go`、`codegen_csharp.go`、`codegen_godot.go`）。两类生成器：
 - **Loader**（`GenCode(root)`）：每种语言运行一次，遍历文件名**不含** `{`/`}` 的模板文件，拿到排序后的 sheet 名列表。
 - **Module**（`GenCode(root, sheet)`）：每个 sheet 运行一次，遍历文件名**含** `{name}`/`{Name}` 的模板文件（小写/原样），替换进输出文件名。模板目录为 `assets/template/<lang>/`。
 
@@ -61,5 +61,5 @@ go build -o excel2pb.exe main.go     # 或运行 build_windows.bat / build_all.b
 
 一个表可声明多个 `pk` 列，语义为复合主键：`checkPrimaryKey` 按主键**组合**去重（单列可重复，组合唯一）。codegen 通过 `CodeModuleModel.Keys`（`[]KeyField`）+ `MultiKey` 传给模板：
 - **单主键**：输出与旧版逐字节一致（`map[T]` / `Dictionary<T,>`，直接用字段名作 key）。
-- **多主键**：golang 生成组合 key 结构体 `<表名>Key{...}` 并以其为 map key；csharp 用 ValueTuple `(t1, t2)` 作 `Dictionary` key。
+- **多主键**：golang 生成组合 key 结构体 `<表名>Key{...}` 并以其为 map key；csharp 用 ValueTuple `(t1, t2)` 作 `Dictionary` key；Godot 使用 `Array` 作为 `Dictionary` key 并生成 `make_key()`。
 `GetI18nPrimaryKey` 用 `_` 拼接所有主键值作为 i18n key 的一部分。

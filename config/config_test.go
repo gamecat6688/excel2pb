@@ -45,7 +45,8 @@ func TestLoadConfigReadsFileAndFallsBackToDefaults(t *testing.T) {
 		t.Fatal(err)
 	}
 	LoadConfig()
-	if Cfg.TimeZone != "+08:00" || Cfg.Outs["Server"].CodeLanguage != "golang" {
+	if Cfg.TimeZone != "+08:00" || Cfg.Outs["Server"].CodeLanguage != "golang" ||
+		Cfg.TplCodePaths["godot"] != "assets/template/godot/" || Cfg.CodeOutPaths["godot"] != "assets/out_code/godot/" {
 		t.Fatalf("default config was not loaded: %#v", Cfg)
 	}
 }
