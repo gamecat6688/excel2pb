@@ -41,6 +41,20 @@ func TestValidateConfigAcceptsConfiguredTestDirectories(t *testing.T) {
 	}
 }
 
+func TestValidateConfigAcceptsClientOnly(t *testing.T) {
+	configureTestExports(t)
+	delete(config.Cfg.Outs, "Server")
+	previousFilters := append([]string(nil), AllFilters...)
+	t.Cleanup(func() { AllFilters = previousFilters })
+
+	if err := ConfigureFilters(config.Cfg.Outs); err != nil {
+		t.Fatalf("configure client-only export: %v", err)
+	}
+	if err := validateConfig(); err != nil {
+		t.Fatalf("valid client-only config rejected: %v", err)
+	}
+}
+
 func TestPathsOverlapTreatsDifferentVolumesAsSeparate(t *testing.T) {
 	overlap, err := pathsOverlap(`C:\source`, `D:\output`)
 	if err != nil || overlap {

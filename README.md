@@ -29,7 +29,7 @@ go build -o excel2pb.exe .
 | `TimeZone` | `timestamp` 字段使用的时区，如 `+08:00` |
 | `MaxProcess` | 最大并发任务数，`0` 使用运行时默认值 |
 | `LogLevel` | `DEBUG`、`INFO`、`WARN` 或 `ERROR` |
-| `Outs.Client/Server` | 两端的 proto、类型代码、数据路径及生成语言 |
+| `Outs.Client/Server` | 要启用的导出端；至少配置一个，未配置的端不会生成任何产物 |
 | `TplCodePaths` | 各语言模板目录 |
 | `CodeOutPaths` | 各语言加载代码输出目录 |
 
@@ -39,7 +39,7 @@ Go 目标必须同时设置：
 - `GoPackagePath`：完整 Go import，例如 `server/pbs`；
 - `GoModulePath`：包含该 import 的 module，例如 `server`。
 
-`ProtoImportPath` 当前必须留空。客户端与服务器不能使用相同的 `CodeLanguage`，否则加载代码会写入同一目录。
+`ProtoImportPath` 当前必须留空。可以只配置 `Outs.Client`（单机或纯客户端项目）、只配置 `Outs.Server`，或同时配置两端。同时配置客户端与服务器时不能使用相同的 `CodeLanguage`，否则加载代码会写入同一目录。
 
 ## Excel 规范
 
@@ -66,7 +66,7 @@ Go 目标必须同时设置：
 - `unique string`：字段值唯一；
 - `repeated int32`：数组字段。
 
-有数据的 Sheet 必须定义主键。主键不能为空、组合必须唯一，并且必须使用 `cs` 导出到两端。
+有数据的 Sheet 必须定义主键。主键不能为空、组合必须唯一，并且必须覆盖所有已配置的导出端；例如只配置 Client 时可以使用 `c` 或 `cs`，同时配置两端时必须使用 `cs`。
 
 ### 字段 tag
 
