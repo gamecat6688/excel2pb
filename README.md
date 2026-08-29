@@ -30,7 +30,7 @@ go build -o excel2pb.exe .
 | `MaxProcess` | 最大并发任务数，`0` 使用运行时默认值 |
 | `LogLevel` | `DEBUG`、`INFO`、`WARN` 或 `ERROR` |
 | `Outs.Client/Server` | 要启用的导出端；至少配置一个，未配置的端不会生成任何产物 |
-| `TplCodePaths` | 各语言模板目录 |
+| `TplCodePaths` | 各语言模板目录；正式可执行文件可使用 `embedded://<语言>` 内置模板 |
 | `CodeOutPaths` | 各语言加载代码输出目录 |
 
 Go 目标必须同时设置：
@@ -40,6 +40,13 @@ Go 目标必须同时设置：
 - `GoModulePath`：包含该 import 的 module，例如 `server`。
 
 `ProtoImportPath` 当前必须留空。可以只配置 `Outs.Client`（单机或纯客户端项目）、只配置 `Outs.Server`，或同时配置两端。同时配置客户端与服务器时不能使用相同的 `CodeLanguage`，否则加载代码会写入同一目录。
+
+使用仓库根目录构建的可执行文件会内置 `assets/template/` 下的模板。分发时不需要附带源码或模板目录，例如 Godot 项目可以配置：
+
+```yaml
+TplCodePaths:
+  godot: embedded://godot
+```
 
 ## Excel 规范
 

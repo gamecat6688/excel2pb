@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"text/template"
 )
 
 var GodotTypeMap = map[string]string{
@@ -54,7 +53,7 @@ func (g *GodotLoaderCodeGenerator) GenCode(root *Parser) bool {
 
 	ok := true
 	for _, filename := range matches {
-		if !executeGodotTemplate(filename, filepath.Join(g.outPath, filepath.Base(filename)), model) {
+		if !executeGodotTemplate(filename, filepath.Join(g.outPath, templateBaseName(filename)), model) {
 			ok = false
 		}
 	}
@@ -123,7 +122,7 @@ func (g *GodotModuleCodeGenerator) GenCode(root *Parser, sheet *SheetParser) boo
 
 	ok := true
 	for _, filename := range matches {
-		baseName := filepath.Base(filename)
+		baseName := templateBaseName(filename)
 		fixedName := ""
 		switch {
 		case strings.Contains(baseName, "{name}"):
@@ -158,7 +157,7 @@ func relativeGodotPath(fromDir, target string, preload bool) string {
 }
 
 func executeGodotTemplate(filename, outputPath string, model any) bool {
-	tmpl, err := template.ParseFiles(filename)
+	tmpl, err := parseCodeTemplate(filename)
 	if err != nil {
 		slog.Error("parse Godot code template fail", "file", filename, "error", err)
 		return false

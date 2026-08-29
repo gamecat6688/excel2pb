@@ -167,12 +167,12 @@ func addCodeOutputs(outputs map[string]*managedOutput, language string, sheets m
 	if err != nil {
 		return err
 	}
-	templates, err := filepath.Glob(filepath.Join(templateRoot, "*.*"))
+	templates, err := listCodeTemplates(templateRoot)
 	if err != nil {
 		return err
 	}
 	for _, templatePath := range templates {
-		base := filepath.Base(templatePath)
+		base := templateBaseName(templatePath)
 		if !strings.Contains(base, "{") {
 			output.expected[base] = struct{}{}
 			output.patterns = append(output.patterns, managedPattern{pattern: base})

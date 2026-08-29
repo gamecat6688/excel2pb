@@ -51,7 +51,7 @@ func validateConfig() error {
 
 	inputs := []configuredPath{{name: "ExcelDir", path: config.Cfg.ExcelDir}}
 	for language, path := range config.Cfg.TplCodePaths {
-		if strings.TrimSpace(path) != "" {
+		if strings.TrimSpace(path) != "" && !isEmbeddedTemplatePath(path) {
 			inputs = append(inputs, configuredPath{name: "TplCodePaths." + language, path: path})
 		}
 	}

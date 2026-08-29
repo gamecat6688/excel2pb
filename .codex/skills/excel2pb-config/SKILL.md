@@ -7,6 +7,8 @@ description: 设计、修改、清理和校验 excel2pb 游戏配置 Excel 表�
 
 excel2pb 将 `assets/xls/` 工作簿导出为 protobuf 二进制和读取代码。先理解表结构和约束，再改数据；这样可在导出前发现会导致 panic 或产生错误数据的问题。
 
+正式构建的 excel2pb 可执行文件内置各语言代码模板。只分发可执行文件时，将 `TplCodePaths.<语言>` 配置为 `embedded://<语言>`；例如 Godot 使用 `embedded://godot`，不需要复制 `assets/template/` 源文件。
+
 ## 按任务加载资料
 
 - 需要用代码读取、修改或创建 `.xlsx`，尤其是读写字段批注时，先读 [references/openpyxl.md](references/openpyxl.md)。只能用支持批注的库；不要用 pandas 写回工作簿。

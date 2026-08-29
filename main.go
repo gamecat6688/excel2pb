@@ -1,16 +1,22 @@
 package main
 
 import (
-	"excel2pb/config"
-	"excel2pb/parser"
-	"excel2pb/works"
+	"embed"
 	"fmt"
 	"log/slog"
 	"runtime"
+
+	"excel2pb/config"
+	"excel2pb/parser"
+	"excel2pb/works"
 )
+
+//go:embed assets/template/*/*
+var builtInTemplates embed.FS
 
 func main() {
 	config.LoadConfig()
+	parser.SetEmbeddedTemplates(builtInTemplates)
 	if err := parser.ConfigureFilters(config.Cfg.Outs); err != nil {
 		panic(fmt.Sprintf("invalid export configuration: %v", err))
 	}
