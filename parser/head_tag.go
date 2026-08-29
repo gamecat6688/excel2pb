@@ -1,6 +1,9 @@
 package parser
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 const (
 	TagFkName    = "fk"
@@ -10,7 +13,7 @@ const (
 type HeadTag string
 
 func (t HeadTag) IsForeignKey() bool {
-	return strings.Index(string(t), TagFkName) != -1
+	return strings.HasPrefix(string(t), TagFkName+":")
 }
 
 // GetKey 获取标签名
@@ -22,21 +25,36 @@ func (t HeadTag) GetKey() string {
 // ParseForeignKey 解析ref标签
 // 简单结构:  fk:Item.ID;
 // 内嵌结构： fk:Resource.ID=Item.ID;
-func (t HeadTag) ParseForeignKey() (embedSheetName, embedFiledName string, fkSheetName, fkFiledName string) {
-	if strings.Index(string(t), "=") == -1 {
-		ss := strings.Split(string(t), ":")
-		nn := strings.Split(ss[1], ".")
-		return "", "", nn[0], nn[1]
+func (t HeadTag) ParseForeignKey() (embedSheetName, embedFiledName string, fkSheetName, fkFiledName string, err error) {
+	key, value, found := strings.Cut(string(t), ":")
+	if !found || key != TagFkName || value == "" {
+		return "", "", "", "", fmt.Errorf("invalid foreign key tag %q", t)
+	}
+	parseReference := func(reference string) (string, string, error) {
+		parts := strings.Split(reference, ".")
+		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+			return "", "", fmt.Errorf("invalid foreign key reference %q", reference)
+		}
+		return parts[0], parts[1], nil
 	}
 
-	// 有=号，说明是子表
-	ss := strings.Split(string(t), ":")
-	cc := strings.Split(ss[1], "=")
-	ems := strings.Split(cc[0], ".")
-	fks := strings.Split(cc[1], ".")
-	return ems[0], ems[1], fks[0], fks[1]
+	if !strings.Contains(value, "=") {
+		fkSheetName, fkFiledName, err = parseReference(value)
+		return "", "", fkSheetName, fkFiledName, err
+	}
+
+	embedReference, targetReference, found := strings.Cut(value, "=")
+	if !found || strings.Contains(targetReference, "=") {
+		return "", "", "", "", fmt.Errorf("invalid embedded foreign key tag %q", t)
+	}
+	embedSheetName, embedFiledName, err = parseReference(embedReference)
+	if err != nil {
+		return "", "", "", "", err
+	}
+	fkSheetName, fkFiledName, err = parseReference(targetReference)
+	return embedSheetName, embedFiledName, fkSheetName, fkFiledName, err
 }
 
 func (t HeadTag) IsIndex() bool {
-	return strings.Index(string(t), TagIndexName) != -1
+	return string(t) == TagIndexName
 }

@@ -2,6 +2,7 @@ package parser
 
 import (
 	"excel2pb/config"
+	"github.com/xuri/excelize/v2"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,7 +20,7 @@ func configureTestExports(t *testing.T) string {
 		ProtoImportPath: "",
 		Outs: map[string]config.OutConfig{
 			"Client": {ProtoPath: filepath.Join(dir, "proto", "client"), DataPath: filepath.Join(dir, "data", "client"), DataExt: ".bytes", PbPath: filepath.Join(dir, "pb", "client"), PackageName: "test", CodeLanguage: "csharp"},
-			"Server": {ProtoPath: filepath.Join(dir, "proto", "server"), DataPath: filepath.Join(dir, "data", "server"), DataExt: ".data", PbPath: filepath.Join(dir, "pb", "server"), PackageName: "test", CodeLanguage: "golang"},
+			"Server": {ProtoPath: filepath.Join(dir, "proto", "server"), DataPath: filepath.Join(dir, "data", "server"), DataExt: ".data", PbPath: filepath.Join(dir, "pb", "server"), PackageName: "test", GoPackagePath: "example.com/server/test", GoModulePath: "example.com/server", CodeLanguage: "golang"},
 		},
 		TplCodePaths: map[string]string{
 			"golang": filepath.Join(dir, "templates", "golang") + string(filepath.Separator),
@@ -41,12 +42,14 @@ func TestGodotCodeGeneration(t *testing.T) {
 	client := config.Cfg.Outs["Client"]
 	client.CodeLanguage = "godot"
 	config.Cfg.Outs["Client"] = client
+	writeTestFile(t, filepath.Join(config.Cfg.TplCodePaths["golang"], "loader.go"), "{{range .Names}}{{.}} {{end}}")
+	writeTestFile(t, filepath.Join(config.Cfg.TplCodePaths["golang"], "data_{name}.go"), "{{.Name}} {{.KeyType}}")
 
 	root := NewParser()
 	attr := makeSheet("Attr", [][]string{
 		{"RaceID", "Type", "Value"},
 		{"pk int32", "pk string", "int64"},
-		{"c", "c", "c"},
+		{"cs", "cs", "cs"},
 		{"race", "type", "value"},
 		{"1", "Attack", "100"},
 	})
@@ -140,6 +143,37 @@ func TestExportPipelineWithoutProtoc(t *testing.T) {
 	}
 }
 
+func TestNestedMessageExportHonorsTargetFieldFilters(t *testing.T) {
+	configureTestExports(t)
+	root := NewParser()
+	child := makeSheet("Child", [][]string{
+		{"ClientValue", "ServerValue"},
+		{"string", "string"},
+		{"c", "s"},
+		{"client", "server"},
+	})
+	parent := makeSheet("Parent", [][]string{
+		{"ID", "Data"},
+		{"pk int32", "Child"},
+		{"cs", "cs"},
+		{"id", "data"},
+		{"1", "client-value|server-value"},
+	})
+	root.sheets[child.sheetName] = child
+	root.sheets[parent.sheetName] = parent
+
+	root.checks()
+	root.exportProto()
+	root.exportData()
+	for _, filter := range AllFilters {
+		cfg := config.Cfg.Outs[FilterFullName[filter]]
+		data, err := os.ReadFile(filepath.Join(cfg.DataPath, "Parent"+cfg.DataExt))
+		if err != nil || len(data) == 0 {
+			t.Fatalf("filtered nested data for %q was not exported: len=%d err=%v", filter, len(data), err)
+		}
+	}
+}
+
 func TestParserMergeI18nAndLookup(t *testing.T) {
 	configureTestExports(t)
 	if err := os.MkdirAll(config.Cfg.ExcelDir, 0o755); err != nil {
@@ -166,5 +200,145 @@ func TestParserMergeI18nAndLookup(t *testing.T) {
 	}
 	if !root.hasSheetParser("Item") || root.getSheetParser("missing") != nil || root.hasEnumParser("missing") || root.getEnumParser("missing") != nil {
 		t.Fatal("parser lookup helpers returned unexpected values")
+	}
+}
+
+func TestParseExcelsDoesNotExportI18nWorkbookWhenDisabled(t *testing.T) {
+	configureTestExports(t)
+	config.Cfg.EnableI18n = false
+	writeRowsWorkbook(t, filepath.Join(config.Cfg.ExcelDir, "Item.xlsx"), "Item", [][]string{
+		{"ID"}, {"pk int32"}, {"cs"}, {""}, {"1"},
+	})
+	writeRowsWorkbook(t, filepath.Join(config.Cfg.ExcelDir, "I18N.xlsx"), I18nSheetName, [][]string{
+		{"ID", "Cn"}, {"pk string", "string"}, {"cs", "cs"}, {"", ""}, {"Item_Name_1", "名称"},
+	})
+
+	root := NewParser()
+	root.ParseExcels()
+	if !root.hasSheetParser("Item") {
+		t.Fatal("source workbook was not parsed")
+	}
+	if root.hasSheetParser(I18nSheetName) {
+		t.Fatal("I18N.xlsx was parsed as a normal source workbook while i18n was disabled")
+	}
+}
+
+func TestMergeI18nValidatesBeforeWritingWorkbook(t *testing.T) {
+	configureTestExports(t)
+	root := NewParser()
+	item := makeSheet("Item", [][]string{
+		{"Description"},
+		{"i18n"},
+		{"cs"},
+		{"description"},
+		{"first"},
+		{"second"},
+	})
+	root.sheets[item.sheetName] = item
+
+	defer func() {
+		if recovered := recover(); recovered == nil || !strings.Contains(recovered.(string), "must define a primary key") {
+			t.Fatalf("unexpected pre-merge validation result: %v", recovered)
+		}
+		if _, err := os.Stat(root.GetI18nFilePath()); !os.IsNotExist(err) {
+			t.Fatalf("I18N workbook was written before validation: %v", err)
+		}
+	}()
+	root.MergeI18n()
+}
+
+func writeRowsWorkbook(t *testing.T, path, sheet string, rows [][]string) {
+	t.Helper()
+	book := excelize.NewFile()
+	if err := book.SetSheetName("Sheet1", sheet); err != nil {
+		t.Fatal(err)
+	}
+	for rowIndex, row := range rows {
+		cell, err := excelize.CoordinatesToCellName(1, rowIndex+1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := book.SetSheetRow(sheet, cell, &row); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := book.SaveAs(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := book.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestProtoFilesForFilterExcludesStaleFiles(t *testing.T) {
+	configureTestExports(t)
+	root := NewParser()
+	root.sheets["Item"] = makeSheet("Item", [][]string{
+		{"ID"}, {"pk int32"}, {"cs"}, {""}, {"1"},
+	})
+	root.enums["Quality"] = &EnumParser{name: "Quality"}
+
+	files := root.protoFilesForFilter(ClientFlag)
+	if len(files) != 2 || filepath.Base(files[0]) != "Item.proto" || filepath.Base(files[1]) != "Quality.proto" {
+		t.Fatalf("unexpected current proto file list: %#v", files)
+	}
+}
+
+func TestI18nSortHandlesMalformedAndUnderscoredKeys(t *testing.T) {
+	i18n := NewI18nParser(nil)
+	i18n.dataRows = [][]string{
+		{"malformed", "one"},
+		{"Sheet_Field_With_Underscore_10", "ten"},
+		{"Sheet_Field_With_Underscore_2", "two"},
+	}
+	i18n.sortDataRows()
+	if i18n.dataRows[0][0] != "Sheet_Field_With_Underscore_2" || i18n.dataRows[1][0] != "Sheet_Field_With_Underscore_10" || i18n.dataRows[2][0] != "malformed" {
+		t.Fatalf("unexpected i18n order: %#v", i18n.dataRows)
+	}
+}
+
+func TestWriteI18nPreservesExistingWorkbookStructure(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "I18N.xlsx")
+	book := excelize.NewFile()
+	if err := book.SetSheetName("Sheet1", I18nSheetName); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := book.NewSheet("Notes"); err != nil {
+		t.Fatal(err)
+	}
+	style, err := book.NewStyle(&excelize.Style{Fill: excelize.Fill{Type: "pattern", Color: []string{"#FF0000"}, Pattern: 1}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := book.SetCellStyle(I18nSheetName, "A4", "A4", style); err != nil {
+		t.Fatal(err)
+	}
+	if err := book.SaveAs(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := book.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	i18n := NewI18nParser(nil)
+	i18n.SetData("Item_Name_1", "item")
+	if err := i18n.WriteToExcel(path); err != nil {
+		t.Fatal(err)
+	}
+
+	written, err := excelize.OpenFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = written.Close() }()
+	if index, err := written.GetSheetIndex("Notes"); err != nil || index == -1 {
+		t.Fatalf("existing sheet was not preserved: index=%d err=%v", index, err)
+	}
+	writtenStyle, err := written.GetCellStyle(I18nSheetName, "A4")
+	if err != nil || writtenStyle != style {
+		t.Fatalf("existing style was not preserved: got=%d want=%d err=%v", writtenStyle, style, err)
 	}
 }

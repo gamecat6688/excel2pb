@@ -22,6 +22,12 @@ type OutConfig struct {
 	// proto包名
 	PackageName string `yaml:"PackageName"`
 
+	// Go protobuf 包的完整导入路径（Go 目标必填）
+	GoPackagePath string `yaml:"GoPackagePath"`
+
+	// Go module 路径（Go 目标必填，必须包含 GoPackagePath）
+	GoModulePath string `yaml:"GoModulePath"`
+
 	// 生成代码的语言
 	CodeLanguage string `yaml:"CodeLanguage"`
 }
@@ -54,11 +60,13 @@ func LoadConfig() {
 
 	cfg := &Config{}
 	data, err := os.ReadFile(configPath)
-	if err != nil {
+	if os.IsNotExist(err) {
 		cfg, err = loadConfigFromData([]byte(defaultConfigData))
 		if err != nil {
 			panic(err)
 		}
+	} else if err != nil {
+		panic(err)
 	} else {
 		cfg, err = loadConfigFromData(data)
 		if err != nil {
@@ -101,6 +109,8 @@ Outs:
     DataPath: assets/out_data/server/
     DataExt: ".data"
     PackageName: "pbs"
+    GoPackagePath: "server/pbs"
+    GoModulePath: "server"
     CodeLanguage: "golang"
 
 TplCodePaths:

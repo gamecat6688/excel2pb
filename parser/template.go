@@ -6,7 +6,7 @@ syntax = "proto3";
 package {{.PackageName}};
 
 option csharp_namespace = "{{.PackageName}}";
-option go_package = "/{{.PackageName}}";
+option go_package = "{{.GoPackagePath}}";
 
 {{range .Imports}}import {{.ProtoPath}}
 {{end}}
@@ -27,7 +27,7 @@ syntax = "proto3";
 package {{.PackageName}};
 
 option csharp_namespace = "{{.PackageName}}";
-option go_package = "/{{.PackageName}}";
+option go_package = "{{.GoPackagePath}}";
 
 
 enum {{.MessageName}} {
@@ -47,17 +47,19 @@ type FieldModel struct {
 	Comment   string
 }
 type ProtoMessageModel struct {
-	PackageName string
-	MessageName string
-	Imports     []ImportModel
-	Fields      []FieldModel
+	PackageName   string
+	GoPackagePath string
+	MessageName   string
+	Imports       []ImportModel
+	Fields        []FieldModel
 }
 
 type ProtoEnumModel struct {
-	PackageName string
-	MessageName string
-	Imports     []ImportModel
-	Fields      []FieldModel
+	PackageName   string
+	GoPackagePath string
+	MessageName   string
+	Imports       []ImportModel
+	Fields        []FieldModel
 }
 
 type CodeLoaderModel struct {
@@ -71,8 +73,10 @@ type KeyField struct {
 }
 
 type CodeModuleModel struct {
-	Name     string
-	FullName string
+	Name          string
+	FullName      string
+	PackageName   string
+	GoPackagePath string
 
 	// ProtoScriptPath Godot 模板使用的 protobuf GDScript 相对资源路径。
 	ProtoScriptPath string

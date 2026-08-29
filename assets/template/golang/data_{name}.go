@@ -1,6 +1,6 @@
 package data
 
-import "server/pbs"
+import {{.PackageName}} "{{.GoPackagePath}}"
 
 type {{.Name}} struct {
 	*{{.FullName}}

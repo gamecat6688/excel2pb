@@ -3,6 +3,7 @@ package main
 import (
 	"excel2pb/config"
 	"excel2pb/parser"
+	"excel2pb/works"
 	"fmt"
 	"log/slog"
 	"runtime"
@@ -12,12 +13,15 @@ func main() {
 	config.LoadConfig()
 
 	var logLevel slog.Level
-	logLevel.UnmarshalText([]byte(config.Cfg.LogLevel))
+	if err := logLevel.UnmarshalText([]byte(config.Cfg.LogLevel)); err != nil {
+		panic(fmt.Sprintf("invalid log level %q: %v", config.Cfg.LogLevel, err))
+	}
 	slog.SetLogLoggerLevel(logLevel)
 
 	if config.Cfg.MaxProcess > 0 {
 		runtime.GOMAXPROCS(config.Cfg.MaxProcess)
 	}
+	works.SetLimit(runtime.GOMAXPROCS(0))
 
 	slog.Info(fmt.Sprintf("max process %v", runtime.GOMAXPROCS(0)))
 

@@ -12,13 +12,14 @@ import (
 
 var (
 	CSharpTypeMap = map[string]string{
-		"int":    "int",
-		"int32":  "int",
-		"int64":  "long",
-		"string": "string",
-		"bool":   "bool",
-		"float":  "float",
-		"double": "double",
+		"int":       "int",
+		"int32":     "int",
+		"int64":     "long",
+		"string":    "string",
+		"bool":      "bool",
+		"float":     "float",
+		"double":    "double",
+		"timestamp": "long",
 	}
 )
 
@@ -35,30 +36,34 @@ func NewCsharpLoaderCode(tplPath, outPath string) *CsharpLoaderCodeGenerator {
 }
 
 func (g *CsharpLoaderCodeGenerator) GenCode(root *Parser) bool {
-	matches, err := filepath.Glob(g.tplPath + "*.*")
+	matches, err := findCodeTemplates(g.tplPath, false)
 	if err != nil {
-		slog.Error("GolangLoaderCodeGenerator.GenCode fail", "error", err)
+		slog.Error("CsharpLoaderCodeGenerator.GenCode fail", "error", err)
+		return false
 	}
+	ok := true
 
 	for _, filename := range matches {
-		if strings.Index(filename, "{") >= 0 {
-			continue
-		}
-
 		// 解析模板
 		tmpl, err := template.ParseFiles(filename)
 		if err != nil {
 			slog.Error("parseFromFile proto message template fail", "error", err)
+			ok = false
 			continue
 		}
 
 		// 创建proto文件
 		outPath := g.outPath
-		os.MkdirAll(outPath, os.ModePerm)
+		if err := os.MkdirAll(outPath, os.ModePerm); err != nil {
+			slog.Error("create code output directory fail", "path", outPath, "error", err)
+			ok = false
+			continue
+		}
 
 		f, err := os.Create(filepath.Join(outPath, filepath.Base(filename)))
 		if err != nil {
 			slog.Error("create code file fail", "error", err)
+			ok = false
 			continue
 		}
 
@@ -76,14 +81,16 @@ func (g *CsharpLoaderCodeGenerator) GenCode(root *Parser) bool {
 		if err != nil {
 			_ = f.Close()
 			slog.Error("tmpl.Execute fail", "error", err)
+			ok = false
 			continue
 		}
 		if err := f.Close(); err != nil {
 			slog.Error("close code file fail", "error", err)
+			ok = false
 		}
 	}
 
-	return true
+	return ok
 }
 
 // 模块
@@ -104,26 +111,33 @@ func (g *CsharpModuleCodeGenerator) GenCode(root *Parser, sheet *SheetParser) bo
 		return false
 	}
 
-	matches, err := filepath.Glob(g.tplPath + "*.*")
+	matches, err := findCodeTemplates(g.tplPath, true)
 	if err != nil {
-		slog.Error("GolangModuleCodeGenerator.GenCode fail", "error", err)
+		slog.Error("CsharpModuleCodeGenerator.GenCode fail", "error", err)
+		return false
 	}
+	pks := sheet.GetPrimaryKeys()
+	if len(pks) == 0 {
+		panic(fmt.Sprintf("not found PrimaryKey when csharp GenCode, sheetName: %v", sheet.sheetName))
+	}
+	ok := true
 
 	for _, filename := range matches {
-		if strings.Index(filename, "{") == -1 {
-			continue
-		}
-
 		// 解析模板
 		tmpl, err := template.ParseFiles(filename)
 		if err != nil {
 			slog.Error("parseFromFile proto message template fail", "error", err)
+			ok = false
 			continue
 		}
 
 		// 创建proto文件
 		outPath := g.outPath
-		os.MkdirAll(outPath, os.ModePerm)
+		if err := os.MkdirAll(outPath, os.ModePerm); err != nil {
+			slog.Error("create code output directory fail", "path", outPath, "error", err)
+			ok = false
+			continue
+		}
 
 		var fixedName string
 		baseName := filepath.Base(filename)
@@ -138,15 +152,11 @@ func (g *CsharpModuleCodeGenerator) GenCode(root *Parser, sheet *SheetParser) bo
 		f, err := os.Create(filepath.Join(outPath, fixedName))
 		if err != nil {
 			slog.Error("create code file fail", "error", err)
+			ok = false
 			continue
 		}
 
 		// 执行模板,输出文件
-		pks := sheet.GetPrimaryKeys()
-		if len(pks) == 0 {
-			panic(fmt.Sprintf("not found PrimaryKey when csharp GenCode, sheetName: %v", sheet.sheetName))
-		}
-
 		keys := make([]KeyField, 0, len(pks))
 		for _, fd := range pks {
 			var keyType string
@@ -174,22 +184,25 @@ func (g *CsharpModuleCodeGenerator) GenCode(root *Parser, sheet *SheetParser) bo
 		}
 
 		m := &CodeModuleModel{
-			Name:     sheet.sheetName,
-			KeyType:  keyType,
-			KeyName:  keys[0].Name,
-			Keys:     keys,
-			MultiKey: multiKey,
+			Name:        sheet.sheetName,
+			PackageName: sheet.getPackageName(),
+			KeyType:     keyType,
+			KeyName:     keys[0].Name,
+			Keys:        keys,
+			MultiKey:    multiKey,
 		}
 		err = tmpl.Execute(f, m)
 		if err != nil {
 			_ = f.Close()
 			slog.Error("tmpl.Execute fail", "error", err)
+			ok = false
 			continue
 		}
 		if err := f.Close(); err != nil {
 			slog.Error("close code file fail", "error", err)
+			ok = false
 		}
 	}
 
-	return true
+	return ok
 }

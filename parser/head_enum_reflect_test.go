@@ -1,6 +1,8 @@
 package parser
 
 import (
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/xuri/excelize/v2"
@@ -11,7 +13,10 @@ func TestHeadTagsAndTypeClassification(t *testing.T) {
 	if !plain.IsForeignKey() || plain.GetKey() != TagFkName {
 		t.Fatal("plain foreign-key tag was not recognized")
 	}
-	embedSheet, embedField, fkSheet, fkField := HeadTag("fk:Reward.ItemID=Item.ID").ParseForeignKey()
+	embedSheet, embedField, fkSheet, fkField, err := HeadTag("fk:Reward.ItemID=Item.ID").ParseForeignKey()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if embedSheet != "Reward" || embedField != "ItemID" || fkSheet != "Item" || fkField != "ID" {
 		t.Fatalf("unexpected embedded foreign key: %q.%q -> %q.%q", embedSheet, embedField, fkSheet, fkField)
 	}
@@ -29,6 +34,35 @@ func TestHeadTagsAndTypeClassification(t *testing.T) {
 	timestamp := Head{info: [HeadCount]string{HeadType: TimestampName}}
 	if timestamp.ProtoType() != "int64" {
 		t.Fatal("timestamp must export as int64")
+	}
+	repeatedTimestamp := Head{info: [HeadCount]string{HeadType: "repeated timestamp"}}
+	if repeatedTimestamp.ProtoType() != "repeated int64" {
+		t.Fatalf("repeated timestamp proto type = %q", repeatedTimestamp.ProtoType())
+	}
+}
+
+func TestMalformedForeignKeyTagReturnsError(t *testing.T) {
+	if _, _, _, _, err := HeadTag("fk:MissingDot").ParseForeignKey(); err == nil {
+		t.Fatal("malformed foreign key tag must return an error")
+	}
+}
+
+func TestEnumRegistrationIsAtomic(t *testing.T) {
+	root := NewParser()
+	var registered atomic.Int32
+	var wait sync.WaitGroup
+	for range 32 {
+		wait.Add(1)
+		go func() {
+			defer wait.Done()
+			if root.addEnumParser("Item_Quality", &EnumParser{name: "Item_Quality"}) {
+				registered.Add(1)
+			}
+		}()
+	}
+	wait.Wait()
+	if registered.Load() != 1 {
+		t.Fatalf("enum registered %d times, want exactly once", registered.Load())
 	}
 }
 
@@ -69,6 +103,40 @@ func TestEnumParser(t *testing.T) {
 		t.Fatal("enum row without a value must be rejected")
 	}
 
+}
+
+func TestEnumParserRejectsInvalidDefinitions(t *testing.T) {
+	tests := []struct {
+		name string
+		rows [][]interface{}
+	}{
+		{name: "InvalidValue_Enum", rows: [][]interface{}{{"Name", "Value"}, {"Invalid", "not-a-number"}}},
+		{name: "NonZero_Enum", rows: [][]interface{}{{"Name", "Value"}, {"First", 1}}},
+		{name: "DuplicateName_Enum", rows: [][]interface{}{{"Name", "Value"}, {"None", 0}, {"None", 1}}},
+		{name: "DuplicateValue_Enum", rows: [][]interface{}{{"Name", "Value"}, {"None", 0}, {"Other", 0}}},
+		{name: "ReservedName_Enum", rows: [][]interface{}{{"Name", "Value"}, {"message", 0}}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			file := excelize.NewFile()
+			defer func() { _ = file.Close() }()
+			if err := file.SetSheetName("Sheet1", test.name); err != nil {
+				t.Fatal(err)
+			}
+			for rowIndex, row := range test.rows {
+				cell, err := excelize.CoordinatesToCellName(1, rowIndex+1)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := file.SetSheetRow(test.name, cell, &row); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if NewEnumParser(test.name).Parse(file) {
+				t.Fatal("invalid enum definition must be rejected")
+			}
+		})
+	}
 }
 
 func TestSetDynamicFields(t *testing.T) {

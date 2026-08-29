@@ -67,24 +67,26 @@ func (h Head) Type() string {
 
 // BaseType 只返回基础类型，不返回repeated, pk, unique等修饰符
 func (h Head) BaseType() string {
-	ss := strings.Split(h.Type(), " ")
-	if len(ss) == 1 {
-		return ss[0]
+	parts := strings.Fields(h.Type())
+	if len(parts) == 0 {
+		return ""
 	}
-	return strings.Trim(ss[1], " ")
+	return parts[len(parts)-1]
 }
 
 // ProtoType 返回protobuf支持的类型
 func (h Head) ProtoType() string {
-	ss := strings.Split(h.Type(), " ")
-	if ss[0] == "repeated" {
-		return h.Type()
-	} else if ss[0] == I18nName {
-		return "string"
-	} else if ss[0] == TimestampName {
-		return "int64"
+	baseType := h.BaseType()
+	switch baseType {
+	case I18nName:
+		baseType = "string"
+	case TimestampName:
+		baseType = "int64"
 	}
-	return h.BaseType()
+	if h.IsRepeated() {
+		return RepeatedName + " " + baseType
+	}
+	return baseType
 }
 
 func (h Head) HasTags() bool {
@@ -93,17 +95,25 @@ func (h Head) HasTags() bool {
 
 // IsPrimaryKey 是否主键
 func (h Head) IsPrimaryKey() bool {
-	return strings.Index(h.Type(), PrimaryKeyName) != -1
+	return h.modifier() == PrimaryKeyName
 }
 
 // IsUnique 是否唯一性
 func (h Head) IsUnique() bool {
-	return strings.Index(h.Type(), UniqueName) != -1
+	return h.modifier() == UniqueName
 }
 
 // IsRepeated 是否数组
 func (h Head) IsRepeated() bool {
-	return strings.Index(h.Type(), RepeatedName) != -1
+	return h.modifier() == RepeatedName
+}
+
+func (h Head) modifier() string {
+	parts := strings.Fields(h.Type())
+	if len(parts) == 2 {
+		return parts[0]
+	}
+	return ""
 }
 
 // IsCustomMessage 是否自定义message结构
@@ -118,16 +128,25 @@ func (h Head) IsCustomEnum(root *Parser) bool {
 
 // IsI18n 是否多语言字段
 func (h Head) IsI18n() bool {
-	return strings.Index(h.Type(), I18nName) != -1
+	return h.BaseType() == I18nName
 }
 
 func (h Head) IsFilter(key string) bool {
 	str := h.info[HeadExport]
-	if str == "" {
+	switch str {
+	case ClientFlag:
+		return key == ClientFlag
+	case ServerFlag:
+		return key == ServerFlag
+	case ClientFlag + ServerFlag:
+		return key == ClientFlag || key == ServerFlag
+	default:
 		return false
 	}
+}
 
-	return strings.Index(str, key) != -1
+func (h Head) ExportFilter() string {
+	return h.info[HeadExport]
 }
 
 // IsExportClient 是否导出客户端 C

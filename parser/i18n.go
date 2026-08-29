@@ -1,8 +1,11 @@
 package parser
 
 import (
+	"fmt"
 	"github.com/xuri/excelize/v2"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 )
@@ -46,6 +49,9 @@ func (i *I18nParser) tryMakeIndex() {
 		i.indexes = map[string]int{}
 
 		for r := 0; r < len(i.dataRows); r++ {
+			if len(i.dataRows[r]) == 0 {
+				continue
+			}
 			id := i.dataRows[r][0]
 			i.indexes[id] = r
 		}
@@ -86,59 +92,76 @@ func (i *I18nParser) SetData(id string, cn string) {
 		i.dataRows = append(i.dataRows, lineData)
 		i.indexes[id] = len(i.dataRows) - 1
 	} else {
+		if len(i.dataRows[index]) < len(i.headers) {
+			i.dataRows[index] = append(i.dataRows[index], make([]string, len(i.headers)-len(i.dataRows[index]))...)
+		}
 		i.dataRows[index][0] = id
 		i.dataRows[index][1] = cn
 	}
 }
 
 func (i *I18nParser) sortDataRows() {
-	// 排序
 	sort.SliceStable(i.dataRows, func(m, n int) bool {
-		ss1 := strings.Split(i.dataRows[m][0], "_")
-		par1 := ss1[0] + ss1[1]
-		id1 := ss1[2]
-
-		ss2 := strings.Split(i.dataRows[n][0], "_")
-		par2 := ss2[0] + ss2[1]
-		id2 := ss2[2]
-
-		// 先比较首字母
-		if par1 != par2 {
-			return par1 < par2
+		left := i.dataRows[m][0]
+		right := i.dataRows[n][0]
+		leftSeparator := strings.LastIndex(left, "_")
+		rightSeparator := strings.LastIndex(right, "_")
+		if leftSeparator < 0 || rightSeparator < 0 {
+			return left < right
 		}
-
-		if IsNumber(id1) {
-			// 数字比较
-			return ToInt64(id1) < ToInt64(id2)
+		leftPrefix, leftID := left[:leftSeparator], left[leftSeparator+1:]
+		rightPrefix, rightID := right[:rightSeparator], right[rightSeparator+1:]
+		if leftPrefix != rightPrefix {
+			return leftPrefix < rightPrefix
 		}
-
-		// 字符比较
-		return id1 < id2
+		if IsNumber(leftID) && IsNumber(rightID) {
+			return ToInt64(leftID) < ToInt64(rightID)
+		}
+		return leftID < rightID
 	})
 }
 
-func (i *I18nParser) WriteToExcel(excelFile string) bool {
+func (i *I18nParser) WriteToExcel(excelFile string) error {
 	i.sortDataRows()
 
-	f := excelize.NewFile()
+	var f *excelize.File
+	existing := true
+	var err error
+	f, err = excelize.OpenFile(excelFile)
+	if os.IsNotExist(err) {
+		existing = false
+		f = excelize.NewFile()
+		if err := f.SetSheetName("Sheet1", I18nSheetName); err != nil {
+			return err
+		}
+	} else if err != nil {
+		return err
+	}
 	defer func() {
 		if err := f.Close(); err != nil {
-			slog.Error("create i18n file fail", "error", err)
+			slog.Error("close i18n file fail", "error", err)
 		}
 	}()
 
-	f.NewSheet(I18nSheetName)
-	f.DeleteSheet("Sheet1")
+	if index, err := f.GetSheetIndex(I18nSheetName); err != nil {
+		return err
+	} else if index == -1 {
+		if _, err := f.NewSheet(I18nSheetName); err != nil {
+			return err
+		}
+	}
 
 	// write header rows
 	for idx, row := range i.headRows {
 		cell, err := excelize.CoordinatesToCellName(1, idx+1)
 		if err != nil {
 			slog.Error("CoordinatesToCellName fail", "error", err)
-			return false
+			return err
 		}
 
-		f.SetSheetRow(I18nSheetName, cell, &row)
+		if err := f.SetSheetRow(I18nSheetName, cell, &row); err != nil {
+			return err
+		}
 	}
 
 	// write dataRows rows
@@ -147,18 +170,39 @@ func (i *I18nParser) WriteToExcel(excelFile string) bool {
 		cell, err := excelize.CoordinatesToCellName(1, headerRowCount+idx+1)
 		if err != nil {
 			slog.Error("CoordinatesToCellName fail", "error", err)
-			return false
+			return err
 		}
-		f.SetSheetRow(I18nSheetName, cell, &row)
+		if err := f.SetSheetRow(I18nSheetName, cell, &row); err != nil {
+			return err
+		}
 	}
 
-	// 根据指定路径保存文件
-	if err := f.SaveAs(excelFile); err != nil {
-		slog.Error("save I18n file fail", "error", err)
-		return false
+	if !existing {
+		style, err := f.NewStyle(&excelize.Style{Alignment: &excelize.Alignment{
+			Horizontal: "center", Vertical: "center", WrapText: true,
+		}})
+		if err != nil {
+			return err
+		}
+		endCell, err := excelize.CoordinatesToCellName(len(i.headers), HeadCount)
+		if err != nil {
+			return err
+		}
+		if err := f.SetCellStyle(I18nSheetName, "A4", endCell, style); err != nil {
+			return err
+		}
+		if err := os.MkdirAll(filepath.Dir(excelFile), 0o755); err != nil {
+			return err
+		}
+		if err := f.SaveAs(excelFile); err != nil {
+			return err
+		}
+		return nil
 	}
-
-	return true
+	if err := f.Save(); err != nil {
+		return fmt.Errorf("save existing workbook: %w", err)
+	}
+	return nil
 }
 
 //func (i *i18n) WriteToExcel(excelFile string) bool {
