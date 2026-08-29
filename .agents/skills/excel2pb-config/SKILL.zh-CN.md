@@ -11,7 +11,7 @@ excel2pb 将 `assets/xls/` 工作簿导出为 protobuf 二进制和读取代码�
 
 ## 按任务加载资料
 
-- 需要用代码读取、修改或创建 `.xlsx`，尤其是读写字段批注时，先读 [references/openpyxl.md](references/openpyxl.md)。只能用支持批注的库；不要用 pandas 写回工作簿。
+- 需要用代码读取、修改或创建 `.xlsx`，尤其是读写字段批注时，先读 [references/openpyxl.zh-CN.md](references/openpyxl.zh-CN.md)。只能用支持批注的库；不要用 pandas 写回工作簿。
 - 新增表或字段时，使用“表结构”“类型”“批注”规则。
 - 填多语言、数组或嵌套结构时，使用对应规则。
 - 在导出前检查时，逐项执行“校验清单”，报告工作簿、sheet、字段和 Excel 行号（数据行号 = 数据下标 + 5）。
