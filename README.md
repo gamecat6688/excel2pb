@@ -12,6 +12,7 @@
 go test ./config ./parser ./works
 go build -o excel2pb.exe .
 .\excel2pb.exe
+.\excel2pb.exe -config path\to\excel2pb.yaml
 ```
 
 程序读取 `config.yaml` 和 `assets/xls/`，默认将结果写入 `assets/out_*`。
