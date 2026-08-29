@@ -56,11 +56,13 @@ type Config struct {
 var Cfg *Config
 
 func LoadConfig() {
-	configPath := "config.yaml"
+	LoadConfigFromPath("config.yaml")
+}
 
+func LoadConfigFromPath(configPath string) {
 	cfg := &Config{}
 	data, err := os.ReadFile(configPath)
-	if os.IsNotExist(err) {
+	if os.IsNotExist(err) && configPath == "config.yaml" {
 		cfg, err = loadConfigFromData([]byte(defaultConfigData))
 		if err != nil {
 			panic(err)

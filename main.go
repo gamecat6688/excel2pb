@@ -2,6 +2,7 @@ package main
 
 import (
 	"embed"
+	"flag"
 	"fmt"
 	"log/slog"
 	"runtime"
@@ -15,7 +16,9 @@ import (
 var builtInTemplates embed.FS
 
 func main() {
-	config.LoadConfig()
+	configPath := flag.String("config", "config.yaml", "path to the YAML configuration file")
+	flag.Parse()
+	config.LoadConfigFromPath(*configPath)
 	parser.SetEmbeddedTemplates(builtInTemplates)
 	if err := parser.ConfigureFilters(config.Cfg.Outs); err != nil {
 		panic(fmt.Sprintf("invalid export configuration: %v", err))

@@ -50,3 +50,17 @@ func TestLoadConfigReadsFileAndFallsBackToDefaults(t *testing.T) {
 		t.Fatalf("default config was not loaded: %#v", Cfg)
 	}
 }
+
+func TestLoadConfigFromPathReadsSelectedFile(t *testing.T) {
+	originalCfg := Cfg
+	t.Cleanup(func() { Cfg = originalCfg })
+
+	configPath := filepath.Join(t.TempDir(), "client.yaml")
+	if err := os.WriteFile(configPath, []byte("TimeZone: '+07:00'\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	LoadConfigFromPath(configPath)
+	if Cfg.TimeZone != "+07:00" {
+		t.Fatalf("selected file config timezone = %q", Cfg.TimeZone)
+	}
+}
