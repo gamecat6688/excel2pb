@@ -11,6 +11,9 @@ import (
 
 func main() {
 	config.LoadConfig()
+	if err := parser.ConfigureFilters(config.Cfg.Outs); err != nil {
+		panic(fmt.Sprintf("invalid export configuration: %v", err))
+	}
 
 	var logLevel slog.Level
 	if err := logLevel.UnmarshalText([]byte(config.Cfg.LogLevel)); err != nil {

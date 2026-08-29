@@ -30,7 +30,7 @@ excel2pb 将 `assets/xls/` 工作簿导出为 protobuf 二进制和读取代码�
 - `unique string`：此列值唯一。
 - `repeated Reward`：数组。
 
-多个 `pk` 是复合主键：每一列可以重复，但整组值必须唯一。主键的每个分量都不可为空；第 3 行必须包含要生成代码的端，通常使用 `cs`。
+多个 `pk` 是复合主键：每一列可以重复，但整组值必须唯一。主键的每个分量都不可为空；第 3 行必须覆盖 `Outs` 中实际配置的全部导出端。仅配置 Client 时可以使用 `c` 或 `cs`，同时配置 Client 和 Server 时必须使用 `cs`。
 
 `timestamp` 填 `YYYY-MM-DD HH:MM:SS`，会按配置的 `TimeZone` 导出 Unix 秒。整数、浮点和布尔值必须能严格解析，不能依赖默认零值。枚举字段可填枚举名称或 32 位整数；枚举表不能为空，第一项必须为 `0`，名称和值均不可重复，例如 `InvalidItemType = 0`。
 

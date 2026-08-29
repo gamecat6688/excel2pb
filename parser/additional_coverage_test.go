@@ -170,15 +170,30 @@ func TestForeignKeyComparisonUsesTypedValue(t *testing.T) {
 	source.checkTags(root)
 }
 
-func TestDataSheetPrimaryKeyMustReachBothTargets(t *testing.T) {
+func TestDataSheetPrimaryKeyMustReachEveryConfiguredTarget(t *testing.T) {
+	previousFilters := AllFilters
+	AllFilters = []string{ClientFlag, ServerFlag}
+	defer func() { AllFilters = previousFilters }()
+
 	s := makeSheet("Item", [][]string{
 		{"ID"}, {"pk int32"}, {"c"}, {""}, {"1"},
 	})
 	defer func() {
-		if recovered := recover(); recovered == nil || !strings.Contains(recovered.(string), "both client and server") {
+		if recovered := recover(); recovered == nil || !strings.Contains(recovered.(string), "every configured target") {
 			t.Fatalf("unexpected primary-key filter result: %v", recovered)
 		}
 	}()
+	s.checks(NewParser())
+}
+
+func TestDataSheetPrimaryKeyMayTargetConfiguredClientOnly(t *testing.T) {
+	previousFilters := AllFilters
+	AllFilters = []string{ClientFlag}
+	defer func() { AllFilters = previousFilters }()
+
+	s := makeSheet("Item", [][]string{
+		{"ID"}, {"pk int32"}, {"c"}, {""}, {"1"},
+	})
 	s.checks(NewParser())
 }
 

@@ -1,6 +1,11 @@
 package parser
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+
+	"excel2pb/config"
+)
 
 const (
 	I18nName       = "i18n"
@@ -23,6 +28,22 @@ var (
 		ServerFlag: "Server",
 	}
 )
+
+// ConfigureFilters enables only the export targets present in config.Outs.
+// Client and Server keep a stable order so generated output remains deterministic.
+func ConfigureFilters(outs map[string]config.OutConfig) error {
+	configured := make([]string, 0, len(FilterFullName))
+	for _, filter := range []string{ClientFlag, ServerFlag} {
+		if _, exists := outs[FilterFullName[filter]]; exists {
+			configured = append(configured, filter)
+		}
+	}
+	if len(configured) == 0 {
+		return fmt.Errorf("Outs must configure at least Client or Server")
+	}
+	AllFilters = configured
+	return nil
+}
 
 // 字段功能
 const (

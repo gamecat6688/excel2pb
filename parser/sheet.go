@@ -352,8 +352,10 @@ func (s *SheetParser) checkHeaderSchema(root *Parser) {
 			panic(fmt.Sprintf("[%s] data sheet must define a primary key", s.configLocation(-1)))
 		}
 		for _, pk := range pks {
-			if pk.ExportFilter() != ClientFlag+ServerFlag {
-				panic(fmt.Sprintf("[%s field=%q] primary key must be exported to both client and server", s.configLocation(-1), pk.Name()))
+			for _, filter := range AllFilters {
+				if !pk.IsFilter(filter) {
+					panic(fmt.Sprintf("[%s field=%q] primary key must be exported to every configured target", s.configLocation(-1), pk.Name()))
+				}
 			}
 		}
 	}
