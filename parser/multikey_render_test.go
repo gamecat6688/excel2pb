@@ -21,11 +21,13 @@ func renderTpl(t *testing.T, path string, m *CodeModuleModel) string {
 
 func TestMultiKeyGolangTemplate(t *testing.T) {
 	m := &CodeModuleModel{
-		Name:     "Attr",
-		FullName: "pbs.Attr",
-		KeyType:  "AttrKey",
-		KeyName:  "RaceID",
-		MultiKey: true,
+		Name:          "Attr",
+		FullName:      "pbs.Attr",
+		PackageName:   "pbs",
+		GoPackagePath: "example.com/server/pbs",
+		KeyType:       "AttrKey",
+		KeyName:       "RaceID",
+		MultiKey:      true,
 		Keys: []KeyField{
 			{Type: "int32", Name: "RaceID"},
 			{Type: "pbs.AttrType", Name: "Type"},
@@ -35,6 +37,7 @@ func TestMultiKeyGolangTemplate(t *testing.T) {
 	t.Logf("\n%s", out)
 
 	for _, want := range []string{
+		`import pbs "example.com/server/pbs"`,
 		"type AttrKey struct {",
 		"RaceID int32",
 		"Type pbs.AttrType",
@@ -49,10 +52,11 @@ func TestMultiKeyGolangTemplate(t *testing.T) {
 
 func TestMultiKeyCsharpTemplate(t *testing.T) {
 	m := &CodeModuleModel{
-		Name:     "Attr",
-		KeyType:  "(int, long)",
-		KeyName:  "RaceID",
-		MultiKey: true,
+		Name:        "Attr",
+		PackageName: "gamepb",
+		KeyType:     "(int, long)",
+		KeyName:     "RaceID",
+		MultiKey:    true,
 		Keys: []KeyField{
 			{Type: "int", Name: "RaceID"},
 			{Type: "long", Name: "Type"},
@@ -62,7 +66,9 @@ func TestMultiKeyCsharpTemplate(t *testing.T) {
 	t.Logf("\n%s", out)
 
 	for _, want := range []string{
+		"using gamepb;",
 		"Dictionary<(int, long), Attr>",
+		"rows.Clear();",
 		"rows[(r.RaceID, r.Type)] = r;",
 		"public Attr Get((int, long) key)",
 	} {

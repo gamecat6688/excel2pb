@@ -7,4 +7,3 @@ SET GOOS=windows
 SET GOARCH=amd64
 
 go build -ldflags "-extldflags '-static'" -o excel2pb.exe main.go
-

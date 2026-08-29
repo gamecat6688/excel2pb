@@ -33,7 +33,7 @@ func NewGodotLoaderCode(tplPath, outPath string) *GodotLoaderCodeGenerator {
 }
 
 func (g *GodotLoaderCodeGenerator) GenCode(root *Parser) bool {
-	matches, err := filepath.Glob(filepath.Join(g.tplPath, "*.*"))
+	matches, err := findCodeTemplates(g.tplPath, false)
 	if err != nil {
 		slog.Error("GodotLoaderCodeGenerator.GenCode fail", "error", err)
 		return false
@@ -54,10 +54,6 @@ func (g *GodotLoaderCodeGenerator) GenCode(root *Parser) bool {
 
 	ok := true
 	for _, filename := range matches {
-		if strings.Contains(filepath.Base(filename), "{") {
-			continue
-		}
-
 		if !executeGodotTemplate(filename, filepath.Join(g.outPath, filepath.Base(filename)), model) {
 			ok = false
 		}
@@ -79,7 +75,7 @@ func (g *GodotModuleCodeGenerator) GenCode(root *Parser, sheet *SheetParser) boo
 		return false
 	}
 
-	matches, err := filepath.Glob(filepath.Join(g.tplPath, "*.*"))
+	matches, err := findCodeTemplates(g.tplPath, true)
 	if err != nil {
 		slog.Error("GodotModuleCodeGenerator.GenCode fail", "error", err)
 		return false
@@ -128,10 +124,6 @@ func (g *GodotModuleCodeGenerator) GenCode(root *Parser, sheet *SheetParser) boo
 	ok := true
 	for _, filename := range matches {
 		baseName := filepath.Base(filename)
-		if !strings.Contains(baseName, "{") {
-			continue
-		}
-
 		fixedName := ""
 		switch {
 		case strings.Contains(baseName, "{name}"):

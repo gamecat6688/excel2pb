@@ -88,8 +88,10 @@ func ToBool(val string) bool {
 // SplitEnumName 分割枚举表名, 去掉Enum后缀
 // 如: ItemType_Enum -> ItemType
 func SplitEnumName(sheetName string) string {
-	ss := strings.Split(sheetName, "_")
-	return ss[0]
+	if strings.HasSuffix(sheetName, "_Enum") {
+		return strings.TrimSuffix(sheetName, "_Enum")
+	}
+	return strings.TrimSuffix(sheetName, "Enum")
 }
 
 // SplitBaseValue 一维数组

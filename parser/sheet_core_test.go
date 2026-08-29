@@ -57,6 +57,31 @@ func TestCompositePrimaryKeyValidation(t *testing.T) {
 	newSheet([][]string{{"1", "1"}, {"1", "1"}}).checkPrimaryKey(NewParser())
 }
 
+func TestPrimaryKeyValidationRejectsEmptyComponents(t *testing.T) {
+	sheet := makeSheet("Item", [][]string{
+		{"ID", "Variant", "Name"},
+		{"pk int32", "pk string", "string"},
+		{"cs", "cs", "cs"},
+		{"", "", ""},
+		{"0", "base", "zero"},
+		{"", "base", "missing"},
+	})
+	sheet.SetSourceFile("assets/xls/item.xlsx")
+	defer func() {
+		recovered := recover()
+		if recovered == nil {
+			t.Fatal("empty primary key component must be rejected")
+		}
+		message := recovered.(string)
+		for _, want := range []string{"excel_row=6", "field=\"ID\"", "primary key value is empty"} {
+			if !strings.Contains(message, want) {
+				t.Fatalf("panic %q does not contain %q", message, want)
+			}
+		}
+	}()
+	sheet.checkPrimaryKey(NewParser())
+}
+
 func TestI18nSetDataMergeAndSort(t *testing.T) {
 	i18n := NewI18nParser(nil)
 	i18n.SetData("Item_Name_10", "old")

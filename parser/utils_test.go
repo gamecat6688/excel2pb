@@ -27,6 +27,9 @@ func TestFormattingHelpers(t *testing.T) {
 	if got := SplitEnumName("ItemType_Enum"); got != "ItemType" {
 		t.Fatalf("SplitEnumName = %q", got)
 	}
+	if got := SplitEnumName("Item_Quality_Enum"); got != "Item_Quality" {
+		t.Fatalf("SplitEnumName with underscores = %q", got)
+	}
 	if got := DataRow2ExcelRow(0); got != 4 {
 		t.Fatalf("DataRow2ExcelRow = %d", got)
 	}

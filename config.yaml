@@ -19,6 +19,8 @@ Outs:
     DataPath: assets/out_data/server/
     DataExt: ".data"
     PackageName: "pbs"
+    GoPackagePath: "server/pbs"
+    GoModulePath: "server"
     CodeLanguage: "golang"
 
 TplCodePaths:
