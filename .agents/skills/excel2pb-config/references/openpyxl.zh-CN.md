@@ -5,7 +5,9 @@ excel2pb 使用单元格批注声明字段约束；读写 `.xlsx` 必须选择�
 - 表头固定四行：第 1 行字段名、第 2 行类型、第 3 行导出过滤、第 4 行说明；数据从第 5 行开始。
 - 只有第 1 行字段名单元格的批注会被视为 tag；多个 tag 用 `;` 分隔。
 - openpyxl 的行、列编号从 1 开始，与 Excel 显示的行号一致。
-- 修改现有工作簿时保留原有样式；第 4 行说明文字使用水平、垂直居中，需要时开启自动换行。
+- 修改现有工作簿时保留颜色、边框、批注和冻结窗格；第 1–4 行所有单元格水平、垂直居中，第 4 行说明文字开启自动换行。
+- 修改字段名或数值后，按可见内容调整列宽。中日韩全角字符按两个显示单位计算，增加水平留白，长文本列最大宽度建议限制为 48；超过上限的文本自动换行并增加行高，不要把整张表拉得过宽。
+- 需要确定性格式化时，优先运行 `../scripts/format_workbooks.py <工作簿或目录>`。它会保留现有工作簿，统一第 1–4 行对齐方式，按 Unicode 显示宽度调整列宽，并处理长文本换行和行高。应在最后一次 excel2pb 导出后运行，因为 i18n 合并可能重新生成 `I18N.xlsx`，覆盖此前的列宽或行高。
 
 ## 读取表与批注
 
@@ -47,15 +49,17 @@ wb.save("assets/xls/物品.xlsx")
 
 如果批注正文包含 `[Threaded comment]`、Excel 版本兼容说明或微软链接，这些文字不是 excel2pb tag。确认其中没有必要的 `fk:` 或 `index` 后删除整个批注；若兼容文本后仍带有实际 `Comment: fk:...`，则把批注规范化为纯 tag 文本。
 
-设置第 4 行居中格式时复用现有对齐属性，只覆盖必要字段：
+设置四行表头格式时复用现有对齐属性，只覆盖必要字段；第 4 行保持自动换行：
 
 ```python
 from copy import copy
 
-for cell in ws[4]:
-    alignment = copy(cell.alignment)
-    alignment.horizontal = "center"
-    alignment.vertical = "center"
-    alignment.wrap_text = True
-    cell.alignment = alignment
+for row in range(1, 5):
+    for cell in ws[row]:
+        alignment = copy(cell.alignment)
+        alignment.horizontal = "center"
+        alignment.vertical = "center"
+        if row == 4:
+            alignment.wrap_text = True
+        cell.alignment = alignment
 ```

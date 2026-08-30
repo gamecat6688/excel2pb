@@ -5,7 +5,9 @@ excel2pb uses cell comments to declare field constraints. When reading or writin
 - The header has four fixed rows: row 1 contains field names, row 2 types, row 3 export filters, and row 4 descriptions. Data starts on row 5.
 - Only comments on field-name cells in row 1 are treated as tags. Separate multiple tags with `;`.
 - openpyxl row and column indexes start at 1 and therefore match the row and column numbers displayed by Excel.
-- Preserve existing styles when editing a workbook. Keep row 4 descriptions horizontally and vertically centered, and enable wrapping where needed.
+- Preserve existing colors, borders, comments, and frozen panes when editing a workbook. Keep every cell in rows 1–4 horizontally and vertically centered, and keep row 4 descriptions wrapped.
+- Fit columns to their visible content after changing field names or values. Count full-width CJK characters as two display units, add horizontal padding, and cap long-text columns at a practical width such as 48. Wrap text beyond that cap and increase the row height rather than creating extremely wide sheets.
+- For deterministic formatting, prefer `../scripts/format_workbooks.py <workbook-or-directory>`. It preserves existing workbooks, centers rows 1–4, computes Unicode-aware column widths, and wraps and raises long rows. Run it after the final excel2pb export because the i18n merge may regenerate `I18N.xlsx` and discard earlier width or height adjustments.
 
 ## Read Sheets and Comments
 
@@ -47,15 +49,17 @@ Replace a comment by assigning a new value to `cell.comment`; delete it by assig
 
 Text such as `[Threaded comment]`, Excel compatibility notices, or Microsoft links is not an excel2pb tag. If the comment contains no required `fk:` or `index` tag, remove the entire comment. If compatibility text wraps an actual value such as `Comment: fk:...`, normalize it to the plain tag text.
 
-When centering row 4, copy the existing alignment and change only the required properties:
+When centering the four header rows, copy each cell's existing alignment and change only the required properties. Keep wrapping enabled for row 4:
 
 ```python
 from copy import copy
 
-for cell in ws[4]:
-    alignment = copy(cell.alignment)
-    alignment.horizontal = "center"
-    alignment.vertical = "center"
-    alignment.wrap_text = True
-    cell.alignment = alignment
+for row in range(1, 5):
+    for cell in ws[row]:
+        alignment = copy(cell.alignment)
+        alignment.horizontal = "center"
+        alignment.vertical = "center"
+        if row == 4:
+            alignment.wrap_text = True
+        cell.alignment = alignment
 ```
